@@ -2,6 +2,9 @@ import 'package:bloom/ui/screens/fund/fund_screen.dart';
 import 'package:bloom/ui/screens/fund/fund_detail_screen.dart';
 import 'package:bloom/ui/screens/auth/login_screen.dart';
 import 'package:bloom/ui/screens/profile/profile_screen.dart';
+import 'package:bloom/ui/screens/garden/garden_screen.dart';
+import 'package:bloom/ui/screens/learn/learn_screen.dart';
+import 'package:bloom/ui/screens/evaluation/evaluation_screen.dart';
 import 'package:bloom/data/services/eco_backend.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -58,10 +61,10 @@ class _MainScaffoldState extends State<MainScaffold>
   late AnimationController _animationController;
 
   final pages = [
-    const Center(child: Text('Info', style: TextStyle(fontSize: 24))),
-    const Center(child: Text('Garden', style: TextStyle(fontSize: 24))),
+    const EvaluationScreen(),
+    const GardenScreen(),
     const MainScreen(),
-    const Center(child: Text('Learn', style: TextStyle(fontSize: 24))),
+    const LearnScreen(),
     const FundScreen(),
   ];
 
