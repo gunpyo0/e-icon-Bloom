@@ -7,7 +7,8 @@
       "Bash(flutter build:*)",
       "Bash(flutter pub:*)",
       "Bash(sed:*)",
-      "Bash(flutter run:*)"
+      "Bash(flutter run:*)",
+      "Bash(git checkout:*)"
     ],
     "deny": []
   }
