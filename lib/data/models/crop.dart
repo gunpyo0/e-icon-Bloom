@@ -1,15 +1,6 @@
-enum CropType {
-  carrot,
-  tomato,
-  pumpkin,
-}
+enum CropType { carrot, tomato, pumpkin }
 
-enum CropStage {
-  empty,
-  planted,
-  growing,
-  mature,
-}
+enum CropStage { empty, planted, growing, mature }
 
 class Crop {
   final CropType type;
@@ -65,7 +56,7 @@ class Crop {
   }
 
   String get id => type.name;
-  
+
   int getCostForStage(CropStage stage) {
     switch (stage) {
       case CropStage.planted:
@@ -95,17 +86,13 @@ class GardenTile {
 
   bool get isEmpty => stage == CropStage.empty;
   bool get canPlant => stage == CropStage.empty;
-  bool get canProgress => stage == CropStage.planted || stage == CropStage.growing;
+  bool get canProgress =>
+      stage == CropStage.planted || stage == CropStage.growing;
   bool get canHarvest => stage == CropStage.mature;
 
   Crop? get crop => cropType != null ? Crop.getCrop(cropType!) : null;
 
-  GardenTile copyWith({
-    int? x,
-    int? y,
-    CropStage? stage,
-    CropType? cropType,
-  }) {
+  GardenTile copyWith({int? x, int? y, CropStage? stage, CropType? cropType}) {
     return GardenTile(
       x: x ?? this.x,
       y: y ?? this.y,
@@ -115,21 +102,21 @@ class GardenTile {
   }
 
   factory GardenTile.fromJson(Map<String, dynamic> json, int x, int y) {
-    final stageStr = json['stage'] as String?;
+    final stageStr = json['stage'] as double?;
     final cropId = json['cropId'] as String?;
-    
+
     CropStage stage = CropStage.empty;
     CropType? cropType;
 
     if (stageStr != null) {
       switch (stageStr) {
-        case 'planted':
+        case 1:
           stage = CropStage.planted;
           break;
-        case 'growing':
+        case 2:
           stage = CropStage.growing;
           break;
-        case 'mature':
+        case 3:
           stage = CropStage.mature;
           break;
         default:
@@ -151,12 +138,7 @@ class GardenTile {
       }
     }
 
-    return GardenTile(
-      x: x,
-      y: y,
-      stage: stage,
-      cropType: cropType,
-    );
+    return GardenTile(x: x, y: y, stage: stage, cropType: cropType);
   }
 }
 
@@ -173,31 +155,24 @@ class Garden {
 
   factory Garden.fromJson(Map<String, dynamic> json) {
     final size = json['size'] as int? ?? 3;
-    final playerCoins = json['coins'] as int? ?? 0;
+    final playerCoins = json['playerCoins'] as int? ?? 0;
     final tilesData = json['tiles'] as Map<String, dynamic>? ?? {};
 
     List<List<GardenTile>> tiles = List.generate(
       size,
-      (y) => List.generate(
-        size,
-        (x) {
-          final tileKey = '$x,$y';
-          final tileData = tilesData[tileKey] as Map<String, dynamic>?;
-          
-          if (tileData != null) {
-            return GardenTile.fromJson(tileData, x, y);
-          } else {
-            return GardenTile(x: x, y: y, stage: CropStage.empty);
-          }
-        },
-      ),
+      (y) => List.generate(size, (x) {
+        final tileKey = '$x,$y';
+        final tileData = tilesData[tileKey] as Map<String, dynamic>?;
+
+        if (tileData != null) {
+          return GardenTile.fromJson(tileData, x, y);
+        } else {
+          return GardenTile(x: x, y: y, stage: CropStage.empty);
+        }
+      }),
     );
 
-    return Garden(
-      size: size,
-      tiles: tiles,
-      playerCoins: playerCoins,
-    );
+    return Garden(size: size, tiles: tiles, playerCoins: playerCoins);
   }
 
   GardenTile getTile(int x, int y) {
