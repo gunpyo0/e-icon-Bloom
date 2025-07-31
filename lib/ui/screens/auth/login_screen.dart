@@ -33,6 +33,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         _emailController.text.trim(),
         _passwordController.text,
       );
+      
+      // 로그인 성공 후 사용자 정보 디버깅
+      final user = EcoBackend.instance.currentUser;
+      print('=== LOGIN SUCCESS DEBUG ===');
+      print('UID: ${user?.uid}');
+      print('Email: ${user?.email}');
+      print('DisplayName: ${user?.displayName}');
+      print('===========================');
+      
+      // 로그인 성공 후 자동 리그 참여
+      await EcoBackend.instance.ensureUserInLeague();
       if (mounted) {
         context.go('/');
       }
@@ -52,6 +63,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     
     try {
       await EcoBackend.instance.signInWithGoogle();
+      
+      // Google 로그인 성공 후 사용자 정보 디버깅
+      final user = EcoBackend.instance.currentUser;
+      print('=== GOOGLE LOGIN SUCCESS DEBUG ===');
+      print('UID: ${user?.uid}');
+      print('Email: ${user?.email}');
+      print('DisplayName: ${user?.displayName}');
+      print('===================================');
+      
+      // 로그인 성공 후 자동 리그 참여
+      await EcoBackend.instance.ensureUserInLeague();
       if (mounted) {
         context.go('/');
       }

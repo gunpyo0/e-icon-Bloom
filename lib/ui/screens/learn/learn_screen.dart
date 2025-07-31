@@ -106,7 +106,7 @@ class LearnScreen extends StatelessWidget {
       onTap: lesson.status != LessonStatus.locked 
         ? () => _onLessonTap(context, lesson)
         : null,
-      child: Container(
+      child: SizedBox(
         width: 80,
         height: 80,
         child: CustomPaint(

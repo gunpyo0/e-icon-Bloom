@@ -115,25 +115,48 @@ class GardenTile {
   }
 
   factory GardenTile.fromJson(Map<String, dynamic> json, int x, int y) {
-    final stageStr = json['stage'] as String?;
+    final stageValue = json['stage'];
     final cropId = json['cropId'] as String?;
     
     CropStage stage = CropStage.empty;
     CropType? cropType;
 
-    if (stageStr != null) {
-      switch (stageStr) {
-        case 'planted':
-          stage = CropStage.planted;
-          break;
-        case 'growing':
-          stage = CropStage.growing;
-          break;
-        case 'mature':
-          stage = CropStage.mature;
-          break;
-        default:
-          stage = CropStage.empty;
+    // stage가 숫자 또는 문자열일 수 있음
+    if (stageValue != null) {
+      if (stageValue is int) {
+        switch (stageValue) {
+          case 0:
+            stage = CropStage.empty;
+            break;
+          case 1:
+            stage = CropStage.planted;
+            break;
+          case 2:
+            stage = CropStage.growing;
+            break;
+          case 3:
+            stage = CropStage.mature;
+            break;
+          default:
+            stage = CropStage.empty;
+        }
+      } else if (stageValue is String) {
+        switch (stageValue) {
+          case 'empty':
+            stage = CropStage.empty;
+            break;
+          case 'planted':
+            stage = CropStage.planted;
+            break;
+          case 'growing':
+            stage = CropStage.growing;  
+            break;
+          case 'mature':
+            stage = CropStage.mature;
+            break;
+          default:
+            stage = CropStage.empty;
+        }
       }
     }
 
@@ -163,18 +186,27 @@ class GardenTile {
 class Garden {
   final int size;
   final List<List<GardenTile>> tiles;
-  final int playerCoins;
+  final int playerPoints;
 
   const Garden({
     required this.size,
     required this.tiles,
-    required this.playerCoins,
+    required this.playerPoints,
   });
 
   factory Garden.fromJson(Map<String, dynamic> json) {
-    final size = json['size'] as int? ?? 3;
-    final playerCoins = json['coins'] as int? ?? 0;
+    print('=== Garden.fromJson DEBUG ===');
+    print('Raw JSON: $json');
+    print('size field: ${json['size']} (type: ${json['size'].runtimeType})');
+    print('point field: ${json['point']} (type: ${json['point'].runtimeType})');
+    
+    // 안전한 타입 변환
+    final size = _safeInt(json['size']) ?? 3;
+    final playerPoints = _safeInt(json['point']) ?? 0;
     final tilesData = json['tiles'] as Map<String, dynamic>? ?? {};
+    
+    print('Converted size: $size, points: $playerPoints');
+    print('=============================');
 
     List<List<GardenTile>> tiles = List.generate(
       size,
@@ -196,7 +228,7 @@ class Garden {
     return Garden(
       size: size,
       tiles: tiles,
-      playerCoins: playerCoins,
+      playerPoints: playerPoints,
     );
   }
 
@@ -215,4 +247,15 @@ int getGardenSizeForLeague(int leagueLevel) {
     return LEAGUE_TO_SIZE[0];
   }
   return LEAGUE_TO_SIZE[leagueLevel];
+}
+
+// 안전한 int 변환 헬퍼 함수
+int? _safeInt(dynamic value) {
+  if (value == null) return null;
+  if (value is int) return value;
+  if (value is double) return value.toInt();
+  if (value is String) {
+    return int.tryParse(value);
+  }
+  return null;
 }

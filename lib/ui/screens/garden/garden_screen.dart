@@ -17,11 +17,88 @@ class GardenScreen extends ConsumerStatefulWidget {
 
 class _GardenScreenState extends ConsumerState<GardenScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  Map<String, dynamic>? _myLeague;
+  List<Map<String, dynamic>> _leagueRanking = [];
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _initializeLeague();
+  }
+
+  Future<void> _initializeLeague() async {
+    // 현재 사용자 정보 디버깅
+    final currentUser = EcoBackend.instance.currentUser;
+    print('=== CURRENT USER DEBUG ===');
+    print('UID: ${currentUser?.uid}');
+    print('Email: ${currentUser?.email}');
+    print('DisplayName: ${currentUser?.displayName}');
+    print('==========================');
+    
+    // 자동 리그 참여 확인
+    await EcoBackend.instance.ensureUserInLeague();
+    
+    // 내 리그 정보 로드
+    await _loadMyLeague();
+  }
+
+  Future<void> _loadMyLeague() async {
+    try {
+      print('=== Loading my league ===');
+      final league = await EcoBackend.instance.myLeague();
+      print('League data: $league');
+      setState(() {
+        _myLeague = league;
+      });
+      
+      if (league['leagueId'] != null) {
+        print('Starting to listen to league ranking for: ${league['leagueId']}');
+        _listenToLeagueRanking(league['leagueId']);
+      } else {
+        print('No league id found in league data');
+      }
+    } catch (e) {
+      print('Failed to load league: $e');
+      // 리그 정보 로드 실패 시 다시 자동 참여 시도
+      print('Retrying league join...');
+      await EcoBackend.instance.ensureUserInLeague();
+      // 재시도
+      try {
+        final league = await EcoBackend.instance.myLeague();
+        setState(() {
+          _myLeague = league;
+        });
+        if (league['leagueId'] != null) {
+          _listenToLeagueRanking(league['leagueId']);
+        }
+      } catch (retryError) {
+        print('Retry failed: $retryError');
+      }
+    }
+  }
+
+  void _listenToLeagueRanking(String leagueId) {
+    print('Setting up listener for league: $leagueId');
+    EcoBackend.instance.leagueMembers(leagueId).listen(
+      (snapshot) {
+        print('Received ranking data: ${snapshot.docs.length} members');
+        final ranking = snapshot.docs.map((doc) {
+          final data = doc.data();
+          data['id'] = doc.id;
+          print('Member: ${data['displayName']} - ${data['point']} points');
+          return data;
+        }).toList();
+        
+        setState(() {
+          _leagueRanking = ranking;
+        });
+        print('Updated ranking state with ${ranking.length} members');
+      },
+      onError: (error) {
+        print('Error listening to league ranking: $error');
+      },
+    );
   }
 
   @override
@@ -179,7 +256,7 @@ class _GardenScreenState extends ConsumerState<GardenScreen> with SingleTickerPr
                   const SizedBox(width: 4),
                   gardenAsync.when(
                     data: (garden) => Text(
-                      '${garden.playerCoins}',
+                      '${garden.playerPoints}',
                       style: TextStyle(
                         color: Colors.amber[700],
                         fontWeight: FontWeight.bold,
@@ -628,7 +705,7 @@ class _GardenScreenState extends ConsumerState<GardenScreen> with SingleTickerPr
             return ListTile(
               leading: Text(crop.icon, style: const TextStyle(fontSize: 24)),
               title: Text(crop.displayName),
-              subtitle: Text('비용: ${crop.cost[0]} 코인'),
+              subtitle: Text('비용: ${crop.cost[0]} 포인트'),
               onTap: () {
                 Navigator.of(context).pop();
                 _plantCrop(context, ref, tile, crop);
@@ -658,8 +735,8 @@ class _GardenScreenState extends ConsumerState<GardenScreen> with SingleTickerPr
             const SizedBox(height: 8),
             Text(crop.displayName, style: const TextStyle(fontSize: 18)),
             const SizedBox(height: 16),
-            Text('성장 비용: $cost 코인'),
-            Text('보유 코인: ${garden.playerCoins} 코인'),
+            Text('성장 비용: $cost 포인트'),
+            Text('보유 포인트: ${garden.playerPoints} 포인트'),
           ],
         ),
         actions: [
@@ -668,7 +745,7 @@ class _GardenScreenState extends ConsumerState<GardenScreen> with SingleTickerPr
             child: const Text('취소'),
           ),
           ElevatedButton(
-            onPressed: garden.playerCoins >= cost
+            onPressed: garden.playerPoints >= cost
                 ? () {
                     Navigator.of(context).pop();
                     _progressCrop(context, ref, tile);
@@ -696,7 +773,7 @@ class _GardenScreenState extends ConsumerState<GardenScreen> with SingleTickerPr
             const SizedBox(height: 8),
             Text(crop.displayName, style: const TextStyle(fontSize: 18)),
             const SizedBox(height: 16),
-            Text('수확 보상: ${crop.reward} 코인'),
+            Text('수확 보상: ${crop.reward} 포인트'),
           ],
         ),
         actions: [
@@ -759,7 +836,7 @@ class _GardenScreenState extends ConsumerState<GardenScreen> with SingleTickerPr
       if (context.mounted) {
         final crop = tile.crop;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${crop?.displayName ?? '작물'}을(를) 수확했습니다! +${crop?.reward ?? 0} 코인')),
+          SnackBar(content: Text('${crop?.displayName ?? '작물'}을(를) 수확했습니다! +${crop?.reward ?? 0} 포인트')),
         );
       }
     } catch (e) {
@@ -770,84 +847,6 @@ class _GardenScreenState extends ConsumerState<GardenScreen> with SingleTickerPr
       }
     }
   }
-}
-
-class IsometricTilePainter extends CustomPainter {
-  final Color topColor;
-  final Color sideColor;
-  final double elevation;
-
-  IsometricTilePainter({
-    required this.topColor,
-    required this.sideColor,
-    required this.elevation,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()..style = PaintingStyle.fill;
-    
-    final width = size.width;
-    final height = size.height;
-    final depth = elevation;
-    
-    // 상단면 (다이아몬드 모양)
-    final topPath = Path();
-    topPath.moveTo(width * 0.5, 0);
-    topPath.lineTo(width, height * 0.25);
-    topPath.lineTo(width * 0.5, height * 0.5);
-    topPath.lineTo(0, height * 0.25);
-    topPath.close();
-    
-    paint.color = topColor;
-    canvas.drawPath(topPath, paint);
-    
-    // 왼쪽 옆면
-    final leftPath = Path();
-    leftPath.moveTo(0, height * 0.25);
-    leftPath.lineTo(width * 0.5, height * 0.5);
-    leftPath.lineTo(width * 0.5, height * 0.5 + depth);
-    leftPath.lineTo(0, height * 0.25 + depth);
-    leftPath.close();
-    
-    paint.color = sideColor.withOpacity(0.8);
-    canvas.drawPath(leftPath, paint);
-    
-    // 오른쪽 옆면  
-    final rightPath = Path();
-    rightPath.moveTo(width * 0.5, height * 0.5);
-    rightPath.lineTo(width, height * 0.25);
-    rightPath.lineTo(width, height * 0.25 + depth);
-    rightPath.lineTo(width * 0.5, height * 0.5 + depth);
-    rightPath.close();
-    
-    paint.color = sideColor.withOpacity(0.6);
-    canvas.drawPath(rightPath, paint);
-    
-    // 상단면 테두리
-    paint.style = PaintingStyle.stroke;
-    paint.strokeWidth = 1.5;
-    paint.color = sideColor.withOpacity(0.4);
-    canvas.drawPath(topPath, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) {
-    return oldDelegate != this;
-  }
-  
-  @override
-  bool operator ==(Object other) {
-    if (identical(this, other)) return true;
-    return other is IsometricTilePainter &&
-        other.topColor == topColor &&
-        other.sideColor == sideColor &&
-        other.elevation == elevation;
-  }
-
-  @override
-  int get hashCode => Object.hash(topColor, sideColor, elevation);
-}
 
   Widget _buildRankingDragHandle(BuildContext context) {
     return Positioned(
@@ -980,21 +979,35 @@ class IsometricTilePainter extends CustomPainter {
   }
 
   Widget _buildRankingList(ScrollController scrollController) {
-    final mockRankings = [
-      {'rank': 1, 'name': 'Username', 'points': '300p'},
-      {'rank': 2, 'name': 'User', 'points': '250p'},
-      {'rank': 3, 'name': 'User', 'points': '220p'},
-      {'rank': 4, 'name': 'User', 'points': '200p'},
-      {'rank': 5, 'name': 'User', 'points': '180p'},
-      {'rank': 6, 'name': 'User', 'points': '160p'},
-      {'rank': 7, 'name': 'User', 'points': '140p'},
-    ];
+    // 7명으로 고정, 빈 자리 채우기
+    final List<Map<String, dynamic>> fullRanking = [];
+    
+    // 실제 유효한 멤버들만 필터링해서 추가
+    final validMembers = _leagueRanking.where((member) => 
+        member['displayName'] != null && 
+        member['displayName'].toString().isNotEmpty
+    ).toList();
+    
+    // 유효한 멤버들 추가 (최대 7명)
+    for (int i = 0; i < validMembers.length && i < 7; i++) {
+      fullRanking.add(validMembers[i]);
+    }
+    
+    // 빈 자리 채우기 (7명까지)
+    for (int i = validMembers.length; i < 7; i++) {
+      fullRanking.add({
+        'id': 'empty_$i',
+        'displayName': '빈 자리',
+        'point': 0,
+        'isEmpty': true,
+      });
+    }
 
     return Container(
       padding: const EdgeInsets.all(20),
       child: ListView.builder(
         controller: scrollController,
-        itemCount: mockRankings.length + 1, // +1 for promote line
+        itemCount: 8, // 7명 + PROMOTE 선 1개
         itemBuilder: (context, index) {
           // PROMOTE 선을 3등 뒤에 표시
           if (index == 3) {
@@ -1003,18 +1016,36 @@ class IsometricTilePainter extends CustomPainter {
           
           // 인덱스 조정 (PROMOTE 선 때문에)
           final rankingIndex = index > 3 ? index - 1 : index;
-          final ranking = mockRankings[rankingIndex];
-          final isTopThree = ranking['rank'] as int <= 3;
+          if (rankingIndex >= 7) return Container();
+          
+          final member = fullRanking[rankingIndex];
+          final rank = rankingIndex + 1;
+          final isCurrentUser = member['id'] == EcoBackend.instance.uidOrEmpty;
+          final isEmpty = member['isEmpty'] == true;
+          final isTopThree = rank <= 3 && !isEmpty;
           
           return Container(
             margin: const EdgeInsets.only(bottom: 12),
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: isTopThree ? Colors.green[50] : Colors.grey[50],
+              color: isEmpty 
+                  ? Colors.grey[100]
+                  : isCurrentUser 
+                      ? Colors.blue[50] 
+                      : isTopThree 
+                          ? Colors.green[50] 
+                          : Colors.grey[50],
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: isTopThree ? Colors.green[200]! : Colors.grey[200]!,
-                width: 2,
+                color: isEmpty
+                    ? Colors.grey[300]!
+                    : isCurrentUser 
+                        ? Colors.blue[300]!
+                        : isTopThree 
+                            ? Colors.green[200]! 
+                            : Colors.grey[200]!,
+                width: isCurrentUser ? 3 : 1,
+                style: isEmpty ? BorderStyle.none : BorderStyle.solid,
               ),
             ),
             child: Row(
@@ -1023,46 +1054,103 @@ class IsometricTilePainter extends CustomPainter {
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                    color: isTopThree ? Colors.green[600] : Colors.grey[400],
+                    color: isEmpty
+                        ? Colors.grey[300]
+                        : isCurrentUser 
+                            ? Colors.blue[600]
+                            : rank == 1 && !isEmpty
+                                ? Colors.amber[600]
+                                : rank == 2 && !isEmpty
+                                    ? Colors.grey[400]
+                                    : rank == 3 && !isEmpty
+                                        ? Colors.brown[400]
+                                        : Colors.grey[400],
                     shape: BoxShape.circle,
                   ),
                   child: Center(
-                    child: Text(
-                      '${ranking['rank']}',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18,
-                      ),
-                    ),
+                    child: isEmpty
+                        ? Icon(
+                            Icons.person_add_outlined,
+                            color: Colors.grey[500],
+                            size: 20,
+                          )
+                        : Text(
+                            '$rank',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 18,
+                            ),
+                          ),
                   ),
                 ),
                 const SizedBox(width: 16),
                 CircleAvatar(
-                  backgroundColor: Colors.grey[300],
-                  child: Icon(
-                    Icons.person,
-                    color: Colors.grey[600],
-                  ),
+                  backgroundColor: isEmpty 
+                      ? Colors.grey[200] 
+                      : isCurrentUser 
+                          ? Colors.blue[100] 
+                          : Colors.grey[300],
+                  child: isEmpty
+                      ? Icon(
+                          Icons.person_outline,
+                          color: Colors.grey[400],
+                        )
+                      : Text(
+                          (member['displayName'] ?? member['name'] ?? 'U')[0].toUpperCase(),
+                          style: TextStyle(
+                            color: isCurrentUser ? Colors.blue[700] : Colors.grey[600],
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
-                  child: Text(
-                    ranking['name'] as String,
-                    style: const TextStyle(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        member['displayName'] ?? member['name'] ?? 'User',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                          color: isEmpty 
+                              ? Colors.grey[400]
+                              : isCurrentUser 
+                                  ? Colors.blue[700] 
+                                  : Colors.black,
+                          fontStyle: isEmpty ? FontStyle.italic : FontStyle.normal,
+                        ),
+                      ),
+                      if (isCurrentUser && !isEmpty)
+                        Text(
+                          'You',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.blue[600],
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                if (!isEmpty)
+                  Text(
+                    '${member['point'] ?? 0}p',
+                    style: TextStyle(
                       fontSize: 16,
-                      fontWeight: FontWeight.w500,
+                      fontWeight: FontWeight.bold,
+                      color: isCurrentUser ? Colors.blue[600] : Colors.green[600],
+                    ),
+                  )
+                else
+                  Text(
+                    '-',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Colors.grey[400],
                     ),
                   ),
-                ),
-                Text(
-                  ranking['points'] as String,
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.green[600],
-                  ),
-                ),
               ],
             ),
           );
@@ -1143,3 +1231,81 @@ class IsometricTilePainter extends CustomPainter {
       ),
     );
   }
+}
+
+class IsometricTilePainter extends CustomPainter {
+  final Color topColor;
+  final Color sideColor;
+  final double elevation;
+
+  IsometricTilePainter({
+    required this.topColor,
+    required this.sideColor,
+    required this.elevation,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..style = PaintingStyle.fill;
+    
+    final width = size.width;
+    final height = size.height;
+    final depth = elevation;
+    
+    // 상단면 (다이아몬드 모양)
+    final topPath = Path();
+    topPath.moveTo(width * 0.5, 0);
+    topPath.lineTo(width, height * 0.25);
+    topPath.lineTo(width * 0.5, height * 0.5);
+    topPath.lineTo(0, height * 0.25);
+    topPath.close();
+    
+    paint.color = topColor;
+    canvas.drawPath(topPath, paint);
+    
+    // 왼쪽 옆면
+    final leftPath = Path();
+    leftPath.moveTo(0, height * 0.25);
+    leftPath.lineTo(width * 0.5, height * 0.5);
+    leftPath.lineTo(width * 0.5, height * 0.5 + depth);
+    leftPath.lineTo(0, height * 0.25 + depth);
+    leftPath.close();
+    
+    paint.color = sideColor.withOpacity(0.8);
+    canvas.drawPath(leftPath, paint);
+    
+    // 오른쪽 옆면  
+    final rightPath = Path();
+    rightPath.moveTo(width * 0.5, height * 0.5);
+    rightPath.lineTo(width, height * 0.25);
+    rightPath.lineTo(width, height * 0.25 + depth);
+    rightPath.lineTo(width * 0.5, height * 0.5 + depth);
+    rightPath.close();
+    
+    paint.color = sideColor.withOpacity(0.6);
+    canvas.drawPath(rightPath, paint);
+    
+    // 상단면 테두리
+    paint.style = PaintingStyle.stroke;
+    paint.strokeWidth = 1.5;
+    paint.color = sideColor.withOpacity(0.4);
+    canvas.drawPath(topPath, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) {
+    return oldDelegate != this;
+  }
+  
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is IsometricTilePainter &&
+        other.topColor == topColor &&
+        other.sideColor == sideColor &&
+        other.elevation == elevation;
+  }
+
+  @override
+  int get hashCode => Object.hash(topColor, sideColor, elevation);
+}

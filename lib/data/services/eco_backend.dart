@@ -72,8 +72,89 @@ class EcoBackend {
   Future<Map<String, dynamic>> myProfile() async =>
       (await _func.httpsCallable('getMyProfile').call()).data;
 
-  Future<Map<String, dynamic>> myLeague() async =>
-      (await _func.httpsCallable('getMyLeague').call()).data;
+  Future<Map<String, dynamic>> myLeague() async {
+    try {
+      // 임시로 Cloud Function 대신 클라이언트에서 직접 처리
+      return await _getMyLeagueLocal();
+    } catch (e) {
+      print('Local league lookup failed, trying cloud function: $e');
+      // 실패하면 원래 방식 시도
+      return (await _func.httpsCallable('getMyLeague').call()).data;
+    }
+  }
+
+  Future<Map<String, dynamic>> _getMyLeagueLocal() async {
+    final uid = currentUser?.uid;
+    if (uid == null) {
+      throw Exception('No authenticated user');
+    }
+
+    print('Looking up league for user: $uid');
+
+    // Find leagues where user is a member
+    final leaguesSnapshot = await _fs.collection('leagues').get();
+    
+    for (final leagueDoc in leaguesSnapshot.docs) {
+      final leagueId = leagueDoc.id;
+      final leagueData = leagueDoc.data();
+      
+      // Check if user is member of this league
+      final memberDoc = await _fs
+          .collection('leagues')
+          .doc(leagueId)
+          .collection('members')
+          .doc(uid)
+          .get();
+      
+      if (memberDoc.exists) {
+        // Get all members ordered by points (descending)
+        final membersSnapshot = await _fs
+            .collection('leagues')
+            .doc(leagueId)
+            .collection('members')
+            .orderBy('point', descending: true)
+            .get();
+        
+        // Calculate actual rank and member count
+        int rank = 1;
+        int actualMemberCount = 0;
+        
+        for (int i = 0; i < membersSnapshot.docs.length; i++) {
+          final doc = membersSnapshot.docs[i];
+          final memberData = doc.data();
+          // Only count valid members (with displayName)
+          if (memberData['displayName'] != null && 
+              memberData['displayName'].toString().trim().isNotEmpty) {
+            actualMemberCount++;
+            if (doc.id == uid) {
+              rank = actualMemberCount; // Use actual rank based on valid members
+            }
+          }
+        }
+        
+        print('User found in league $leagueId, rank: $rank, members: $actualMemberCount');
+        
+        return {
+          'leagueId': leagueId,
+          'league': {
+            ...leagueData,
+            'memberCount': actualMemberCount // Use actual member count
+          },
+          'rank': rank,
+          'memberCount': actualMemberCount
+        };
+      }
+    }
+    
+    // User not in any league
+    print('User $uid not found in any league');
+    return {
+      'leagueId': null,
+      'league': null,
+      'rank': null,
+      'memberCount': 0
+    };
+  }
 
   Future<Map<String, dynamic>> anotherProfile(String uid) async =>
       (await _func.httpsCallable('getUserProfile')
@@ -84,8 +165,29 @@ class EcoBackend {
       _func.httpsCallable('completeLesson').call({'lessonIds': ids});
 
   /*──────────────────────── Garden ────────────────────────────*/
-  Future<Map<String, dynamic>> myGarden() async =>
-      (await _func.httpsCallable('getMyGarden').call()).data;
+  Future<Map<String, dynamic>> myGarden() async {
+    try {
+      return (await _func.httpsCallable('getMyGarden').call()).data;
+    } catch (e) {
+      print('Cloud Function failed, returning mock garden data: $e');
+      // Cloud Function이 실패하면 임시 데이터 반환
+      return {
+        'size': 3,
+        'point': 100,
+        'tiles': {
+          "0,0": {'stage': 0}, // 0 = empty
+          "0,1": {'stage': 0},
+          "0,2": {'stage': 0},
+          "1,0": {'stage': 0},
+          "1,1": {'stage': 0},
+          "1,2": {'stage': 0},
+          "2,0": {'stage': 0},
+          "2,1": {'stage': 0},
+          "2,2": {'stage': 0},
+        }
+      };
+    }
+  }
 
   Future<Map<String, dynamic>> otherGarden(String uid) async =>
       (await _func.httpsCallable('getUserGarden')
@@ -99,6 +201,9 @@ class EcoBackend {
 
   Future<void> harvestCrop(int x, int y) =>
       _func.httpsCallable('harvestCrop').call({'x': x, 'y': y});
+
+  Future<void> addPoints(int amount) =>
+      _func.httpsCallable('addPoints').call({'amount': amount});
 
   /*──────────────────────── Posts ────────────────────────────*/
   /// ① 새 글 생성 → Storage 업로드 경로 반환
@@ -128,8 +233,235 @@ class EcoBackend {
   Future<List<dynamic>> allPosts() async =>
       (await _func.httpsCallable('listAllPosts').call()).data as List<dynamic>;
 
+  Future<void> deleteAllPosts() async =>
+      (await _func.httpsCallable('deleteAllPosts').call());
+
   /*──────────────── Stream / 실시간 순위표 ────────────────────*/
   Stream<QuerySnapshot<Map<String, dynamic>>> leagueMembers(String leagueId) =>
       _fs.collection('leagues').doc(leagueId).collection('members')
          .orderBy('point', descending: true).snapshots();
+
+  /*──────────────────── 자동 리그 참여 (최대 7명) ────────────────────*/  
+  Future<void> ensureUserInLeague() async {
+    final uid = currentUser?.uid;
+    print('=== ensureUserInLeague called with uid: $uid ===');
+    if (uid == null) {
+      print('No current user, skipping league join');
+      return;
+    }
+
+    try {
+      // 이미 리그에 속해있는지 확인
+      print('Checking if user is already in a league...');
+      final userLeague = await myLeague();
+      print('Current league status: $userLeague');
+      if (userLeague['leagueId'] != null) {
+        print('User already in league: ${userLeague['leagueId']}');
+        return; // 이미 리그에 속해있음
+      }
+    } catch (e) {
+      print('User not in league yet (expected): $e');
+      // 리그에 속해있지 않음, 계속 진행
+    }
+
+    try {
+      print('Looking for available leagues...');
+      // 7명 미만인 리그 찾기
+      final leaguesQuery = await _fs.collection('leagues')
+          .where('memberCount', isLessThan: 7)
+          .orderBy('memberCount', descending: true)
+          .limit(1)
+          .get();
+
+      String leagueId;
+      
+      if (leaguesQuery.docs.isNotEmpty) {
+        // 기존 리그에 참여
+        leagueId = leaguesQuery.docs.first.id;
+        print('Found existing league: $leagueId with ${leaguesQuery.docs.first.data()['memberCount']} members');
+        
+        try {
+          // 리그 멤버수 증가
+          await _fs.collection('leagues').doc(leagueId).update({
+            'memberCount': FieldValue.increment(1),
+          });
+          print('Updated league member count');
+        } catch (updateError) {
+          print('Error updating member count: $updateError');
+          // 계속 진행 (멤버 추가는 시도)
+        }
+      } else {
+        // 새 리그 생성
+        final newLeagueRef = _fs.collection('leagues').doc();
+        leagueId = newLeagueRef.id;
+        print('Creating new league: $leagueId');
+        
+        try {
+          await newLeagueRef.set({
+            'name': 'League ${DateTime.now().millisecondsSinceEpoch}',
+            'memberCount': 1,
+            'createdAt': FieldValue.serverTimestamp(),
+          });
+          print('New league created');
+        } catch (createError) {
+          print('Error creating league: $createError');
+          throw createError; // 리그 생성 실패시 중단
+        }
+      }
+
+      // 사용자를 리그 멤버로 추가
+      final displayName = currentUser?.displayName ?? currentUser?.email?.split('@')[0] ?? 'User';
+      print('Adding user to league with displayName: $displayName');
+      
+      final memberData = {
+        'uid': uid,
+        'displayName': displayName,
+        'point': 0,
+        'joinedAt': FieldValue.serverTimestamp(),
+      };
+      print('Member data to add: $memberData');
+      
+      await _fs.collection('leagues').doc(leagueId).collection('members').doc(uid).set(memberData);
+      print('Firestore write completed');
+
+      // 추가 확인: 실제로 추가되었는지 확인
+      final addedDoc = await _fs.collection('leagues').doc(leagueId).collection('members').doc(uid).get();
+      print('Verification - Document exists: ${addedDoc.exists}');
+      if (addedDoc.exists) {
+        print('Verification - Document data: ${addedDoc.data()}');
+      }
+
+      print('User successfully joined league: $leagueId');
+    } catch (e) {
+      print('Failed to join league: $e');
+      print('Error details: ${e.toString()}');
+    }
+  }
+
+  /*──────────────────── 리그 멤버 백업/복구 ────────────────────*/
+  Future<void> backupLeagueMembers() async {
+    try {
+      print('=== BACKING UP LEAGUE MEMBERS ===');
+      
+      // 먼저 기존 사용자들 찾기
+      await _findExistingUsers();
+      
+      // 알려진 사용자들을 다시 추가
+      final knownUsers = [
+        {
+          'uid': 'AFMf69C8UkWutorsxQnUToAurTI2', // 임건표의 UID
+          'displayName': '임건표',
+          'point': 0,
+        },
+        {
+          'uid': currentUser?.uid, // 현재 사용자
+          'displayName': currentUser?.displayName ?? currentUser?.email?.split('@')[0] ?? 'User',  
+          'point': 0,
+        },
+      ];
+
+      // s1l1 리그에 멤버들 추가
+      const leagueId = 's1l1';
+      
+      for (final user in knownUsers) {
+        if (user['uid'] != null && user['uid'].toString().isNotEmpty) {
+          try {
+            await _fs.collection('leagues').doc(leagueId).collection('members').doc(user['uid'].toString()).set({
+              'uid': user['uid'],
+              'displayName': user['displayName'],
+              'point': user['point'],
+              'joinedAt': FieldValue.serverTimestamp(),
+            });
+            print('Added user: ${user['displayName']} (${user['uid']})');
+          } catch (e) {
+            print('Failed to add user ${user['displayName']}: $e');
+          }
+        }
+      }
+
+      // 리그 정보도 복구
+      await _fs.collection('leagues').doc(leagueId).set({
+        'stage': 1,
+        'index': 1,
+        'memberCount': knownUsers.where((u) => u['uid'] != null).length,
+        'createdAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      print('League backup completed for league: $leagueId');
+      
+    } catch (e) {
+      print('Error during backup: $e');
+    }
+  }
+
+  /*──────────────────── 기존 사용자 찾기 ────────────────────*/
+  Future<void> _findExistingUsers() async {
+    try {
+      print('=== FINDING EXISTING USERS ===');
+      
+      // 모든 리그에서 기존 멤버들 찾기
+      final leaguesSnapshot = await _fs.collection('leagues').get();
+      
+      for (final leagueDoc in leaguesSnapshot.docs) {
+        final leagueId = leagueDoc.id;
+        print('Checking league: $leagueId');
+        
+        final membersSnapshot = await _fs
+            .collection('leagues')
+            .doc(leagueId)
+            .collection('members')
+            .get();
+        
+        for (final memberDoc in membersSnapshot.docs) {
+          final memberData = memberDoc.data();
+          final uid = memberDoc.id;
+          final displayName = memberData['displayName'] ?? 'Unknown';
+          print('Found existing member: $displayName (UID: $uid)');
+          
+          // mb M을 찾으면 별도 로그
+          if (displayName.toLowerCase().contains('mb') || displayName.toLowerCase().contains('m')) {
+            print('*** POTENTIAL MB M USER: $displayName (UID: $uid) ***');
+          }
+        }
+      }
+      
+    } catch (e) {
+      print('Error finding existing users: $e');
+    }
+  }
+
+  /*──────────────────── 현재 리그 상태 확인 ────────────────────*/
+  Future<void> checkLeagueStatus() async {
+    try {
+      print('=== LEAGUE STATUS CHECK ===');
+      
+      final leaguesSnapshot = await _fs.collection('leagues').get();
+      
+      for (final leagueDoc in leaguesSnapshot.docs) {
+        final leagueId = leagueDoc.id;
+        final leagueData = leagueDoc.data();
+        
+        print('League: $leagueId');
+        print('Data: $leagueData');
+        
+        // Get members
+        final membersSnapshot = await _fs
+            .collection('leagues')
+            .doc(leagueId)
+            .collection('members')
+            .get();
+            
+        print('Members count: ${membersSnapshot.docs.length}');
+        
+        for (final memberDoc in membersSnapshot.docs) {
+          final memberData = memberDoc.data();
+          print('  - ${memberDoc.id}: ${memberData['displayName']} (${memberData['point']} points)');
+        }
+        print('---');
+      }
+      
+    } catch (e) {
+      print('Error checking league status: $e');
+    }
+  }
 }

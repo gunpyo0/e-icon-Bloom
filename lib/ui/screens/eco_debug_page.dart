@@ -107,6 +107,17 @@ class _EcoDebugPageState extends State<EcoDebugPage> {
                 onPressed: () async => _addLog(await _b.myGarden()),
                 child: const Text('myGarden')),
             ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.amber),
+                onPressed: () async {
+                  try {
+                    await _b.addPoints(100);
+                    _addLog('💰 포인트 100개 추가됨!');
+                  } catch (e) {
+                    _addLog('❌ 포인트 추가 실패: $e');
+                  }
+                },
+                child: const Text('Add 100 Points', style: TextStyle(color: Colors.white))),
+            ElevatedButton(
                 onPressed: () async {
                   await _b.plantCrop(0, 0, 'carrot');
                   _addLog('🌱 (0,0) carrot 심기 OK');
@@ -159,6 +170,17 @@ class _EcoDebugPageState extends State<EcoDebugPage> {
                     _addLog('🗳️ 글 $id 에 10점 투표');
                   },
                   child: const Text('vote first unvoted (10)')),
+              ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                  onPressed: () async {
+                    try {
+                      await _b.deleteAllPosts();
+                      _addLog('🗑️ 모든 포스트 삭제 완료!');
+                    } catch (e) {
+                      _addLog('❌ 포스트 삭제 실패: $e');
+                    }
+                  },
+                  child: const Text('Delete All Posts', style: TextStyle(color: Colors.white))),
             ],
           ),
           const Divider(),
@@ -175,6 +197,51 @@ class _EcoDebugPageState extends State<EcoDebugPage> {
                 });
               },
               child: const Text('listen league stream')),
+          const Divider(),
+
+          /*────────── League 백업/복구 ─────────*/
+          const Text('🟢 League Backup/Recovery', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red)),
+          Wrap(
+            spacing: 8,
+            children: [
+              ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                  onPressed: () async {
+                    _addLog('🔄 League 백업 시작...');
+                    try {
+                      await _b.backupLeagueMembers();
+                      _addLog('✅ League 백업 완료!');
+                    } catch (e) {
+                      _addLog('❌ League 백업 실패: $e');
+                    }
+                  },
+                  child: const Text('Backup League Members', style: TextStyle(color: Colors.white))),
+              ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
+                  onPressed: () async {
+                    _addLog('🔍 League 상태 확인...');
+                    try {
+                      await _b.checkLeagueStatus();
+                      _addLog('✅ League 상태 확인 완료!');
+                    } catch (e) {
+                      _addLog('❌ League 상태 확인 실패: $e');
+                    }
+                  },
+                  child: const Text('Check League Status', style: TextStyle(color: Colors.white))),
+              ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+                  onPressed: () async {
+                    _addLog('👤 사용자 리그 참여 확인...');
+                    try {
+                      await _b.ensureUserInLeague();
+                      _addLog('✅ 사용자 리그 참여 완료!');
+                    } catch (e) {
+                      _addLog('❌ 사용자 리그 참여 실패: $e');
+                    }
+                  },
+                  child: const Text('Ensure User in League', style: TextStyle(color: Colors.white))),
+            ],
+          ),
           const SizedBox(height: 24),
 
           /*────────── 로그 출력 ─────────*/

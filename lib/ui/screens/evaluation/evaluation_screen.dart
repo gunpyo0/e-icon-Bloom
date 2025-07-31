@@ -511,7 +511,7 @@ class _CreatePostWidgetState extends State<CreatePostWidget> {
           if (kIsWeb) {
             // 웹에서는 XFile을 그대로 File로 변환
             imageFile = File(_selectedXFile!.path);
-            print('Web: Using XFile as File: ${imageFile?.path}');
+            print('Web: Using XFile as File: ${imageFile.path}');
           } else {
             // 모바일에서는 _selectedImage 사용
             imageFile = _selectedImage;

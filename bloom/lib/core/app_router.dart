@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../ui/screens/main/main_screen.dart';
 
 final appRouter = GoRouter(
   routes: [

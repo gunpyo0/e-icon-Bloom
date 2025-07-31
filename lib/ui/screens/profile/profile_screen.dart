@@ -32,6 +32,11 @@ class ProfileScreen extends ConsumerWidget {
         ),
         actions: [
           IconButton(
+            icon: const Icon(Icons.bug_report),
+            onPressed: () => context.push('/debug'),
+            tooltip: '디버그 페이지',
+          ),
+          IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () => _showLogoutDialog(context),
           ),
@@ -219,15 +224,33 @@ class ProfileScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 16),
             leagueAsync.when(
-              data: (league) => Column(
-                children: [
-                  _buildStatRow('리그명', league['name'] ?? '미참여'),
-                  const SizedBox(height: 12),
-                  _buildStatRow('내 순위', '#${league['myRank'] ?? 0}'),
-                  const SizedBox(height: 12),
-                  _buildStatRow('총 참여자', '${league['totalMembers'] ?? 0}명'),
-                ],
-              ),
+              data: (league) {
+                // leagueId가 있으면 참여 중, 없으면 미참여
+                final hasLeague = league['leagueId'] != null;
+                final leagueInfo = league['league'] as Map<String, dynamic>?;
+                
+                if (!hasLeague) {
+                  return Column(
+                    children: [
+                      _buildStatRow('리그명', '미참여'),
+                      const SizedBox(height: 12),
+                      _buildStatRow('내 순위', '-'),
+                      const SizedBox(height: 12),
+                      _buildStatRow('총 참여자', '-'),
+                    ],
+                  );
+                }
+                
+                return Column(
+                  children: [
+                    _buildStatRow('리그명', 'League S${leagueInfo?['stage'] ?? 1}L${leagueInfo?['index'] ?? 1}'),
+                    const SizedBox(height: 12),
+                    _buildStatRow('내 순위', '#${league['rank'] ?? 0}'),
+                    const SizedBox(height: 12),
+                    _buildStatRow('총 참여자', '${leagueInfo?['memberCount'] ?? 0}명'),
+                  ],
+                );
+              },
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (error, _) => Center(
                 child: Text(

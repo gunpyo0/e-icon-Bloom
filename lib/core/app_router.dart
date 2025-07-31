@@ -5,6 +5,7 @@ import 'package:bloom/ui/screens/profile/profile_screen.dart';
 import 'package:bloom/ui/screens/garden/garden_screen.dart';
 import 'package:bloom/ui/screens/learn/learn_screen.dart';
 import 'package:bloom/ui/screens/evaluation/evaluation_screen.dart';
+import 'package:bloom/ui/screens/eco_debug_page.dart';
 import 'package:bloom/data/services/eco_backend.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -43,6 +44,10 @@ final appRouter = GoRouter(
         final fundId = state.pathParameters['fundId']!;
         return FundDetailScreen(fundId: fundId);
       },
+    ),
+    GoRoute(
+      path: '/debug',
+      builder: (context, state) => const EcoDebugPage(),
     ),
   ],
 );

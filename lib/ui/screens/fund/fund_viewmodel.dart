@@ -1,6 +1,5 @@
 // lib/ui/screens/fund/fund_viewmodel.dart
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../data/services/eco_backend.dart';
 
 // 펀딩 프로젝트 모델
 class FundingProject {
