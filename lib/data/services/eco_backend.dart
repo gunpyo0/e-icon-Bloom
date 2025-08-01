@@ -464,4 +464,45 @@ class EcoBackend {
       print('Error checking league status: $e');
     }
   }
+
+  /*──────────────────── 사용자 포인트 조회 ────────────────────*/
+  Future<int> getUserPoints() async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) return 0;
+
+      // 현재 사용자 정보 조회
+      final userDoc = await _fs.collection('users').doc(user.uid).get();
+      if (!userDoc.exists) return 0;
+
+      final userData = userDoc.data()!;
+      return userData['totalPoints'] ?? 0;
+    } catch (e) {
+      print('Error getting user points: $e');
+      return 0;
+    }
+  }
+
+  /*──────────────────── 사용자 랭킹 조회 ────────────────────*/
+  Future<int> getUserRank() async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) return 0;
+
+      // 현재 사용자 포인트 조회
+      final currentUserPoints = await getUserPoints();
+      
+      // 전체 사용자 중에서 현재 사용자보다 높은 포인트를 가진 사용자 수 조회
+      final higherScoreUsersSnapshot = await _fs
+          .collection('users')
+          .where('totalPoints', isGreaterThan: currentUserPoints)
+          .get();
+
+      // 랭킹은 자신보다 높은 점수를 가진 사용자 수 + 1
+      return higherScoreUsersSnapshot.docs.length + 1;
+    } catch (e) {
+      print('Error getting user rank: $e');
+      return 0;
+    }
+  }
 }

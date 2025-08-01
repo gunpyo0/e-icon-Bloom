@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:bloom/data/services/eco_backend.dart';
 import 'package:bloom/data/models/crop.dart';
+import 'flame_garden_widget.dart';
 
 final gardenProvider = FutureProvider<Garden>((ref) async {
   final gardenData = await EcoBackend.instance.myGarden();
@@ -288,48 +289,9 @@ class _GardenScreenState extends ConsumerState<GardenScreen> with SingleTickerPr
               maxWidth: MediaQuery.of(context).size.width - 40,
               maxHeight: MediaQuery.of(context).size.width - 40,
             ),
-            child: AspectRatio(
-              aspectRatio: 1.0,
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      const Color(0xFF8D6E63),
-                      const Color(0xFF6D4C41),
-                      const Color(0xFF5D4037),
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFF4E342E), width: 3),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.3),
-                      blurRadius: 8,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                padding: const EdgeInsets.all(12),
-                child: GridView.builder(
-                  physics: const NeverScrollableScrollPhysics(),
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: garden.size,
-                    crossAxisSpacing: 2,
-                    mainAxisSpacing: 2,
-                    childAspectRatio: 1.1,
-                  ),
-                  itemCount: garden.size * garden.size,
-                  itemBuilder: (context, index) {
-                    final x = index % garden.size;
-                    final y = index ~/ garden.size;
-                    final tile = garden.getTile(x, y);
-                    
-                    return _buildGardenTile(context, ref, tile, garden);
-                  },
-                ),
-              ),
+            child: FlameGardenWidget(
+              garden: garden,
+              onRefresh: () => ref.refresh(gardenProvider),
             ),
           ),
         ),
