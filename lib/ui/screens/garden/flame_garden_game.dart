@@ -807,7 +807,7 @@ class ActionOverlay extends PositionComponent with HasGameReference<FlameGardenG
     final cancelButton = ActionButton(
       actionType: 'cancel',
       icon: '×',
-      label: '닫기',
+      label: 'Cancel',
       color: Colors.grey.shade600,
       size: Vector2.all(cancelSize),
       position: Vector2(
@@ -854,7 +854,7 @@ class ActionOverlay extends PositionComponent with HasGameReference<FlameGardenG
       actions.add({
         'type': 'plant',
         'icon': '🌱',
-        'label': '심기',
+        'label': 'Plant',
         'color': Colors.green.shade400,
       });
     }
@@ -863,7 +863,7 @@ class ActionOverlay extends PositionComponent with HasGameReference<FlameGardenG
       actions.add({
         'type': 'progress',
         'icon': '💧',
-        'label': '성장',
+        'label': 'Grow',
         'color': Colors.blue.shade400,
       });
     }
@@ -872,7 +872,7 @@ class ActionOverlay extends PositionComponent with HasGameReference<FlameGardenG
       actions.add({
         'type': 'harvest',
         'icon': '⭐',
-        'label': '수확',
+        'label': 'Harvest',
         'color': Colors.amber.shade400,
       });
     }

@@ -574,7 +574,7 @@ class FundScreen extends ConsumerWidget {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        '${project.currentAmount.toStringAsFixed(0)} KRW',
+                        '${project.currentAmount.toStringAsFixed(0)} Points',
                         style: const TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.bold,
@@ -815,7 +815,7 @@ class FundScreen extends ConsumerWidget {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        '${project.currentAmount.toStringAsFixed(0)} KRW',
+                        '${project.currentAmount.toStringAsFixed(0)} Points',
                         style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
@@ -835,7 +835,7 @@ class FundScreen extends ConsumerWidget {
                   const SizedBox(height: 4),
                   
                   Text(
-                    'Goal: ${project.targetAmount.toStringAsFixed(0)} KRW',
+                    'Goal: ${project.targetAmount.toStringAsFixed(0)} Points',
                     style: TextStyle(
                       fontSize: 14,
                       color: Colors.grey.shade600,

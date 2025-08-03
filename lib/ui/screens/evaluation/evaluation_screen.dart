@@ -145,7 +145,7 @@ class _EvaluationScreenState extends State<EvaluationScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    '활동 올리기',
+                    'Create Post',
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 18,

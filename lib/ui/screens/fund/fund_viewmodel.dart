@@ -1,5 +1,6 @@
 // lib/ui/screens/fund/fund_viewmodel.dart
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:bloom/data/services/eco_backend.dart';
 
 // 펀딩 프로젝트 모델
 class FundingProject {
@@ -85,53 +86,10 @@ class FundViewModel extends AsyncNotifier<List<FundingProject>> {
 
   Future<List<FundingProject>> _loadFundingProjects() async {
     try {
-      // 임시 데이터 (실제로는 EcoBackend를 통해 가져와야 함)
-      // Firebase Functions에 getFundingProjects 함수가 있다고 가정
+      // EcoBackend를 통해 실제 Firestore 데이터 가져오기
+      final projectsData = await EcoBackend.instance.getFundingProjects();
       
-      // final result = await EcoBackend.instance
-      //     .getFundingProjects(); // 이 함수는 실제 구현 필요
-      
-      // 임시 더미 데이터
-      await Future.delayed(const Duration(seconds: 1)); // 로딩 시뮬레이션
-      
-      return [
-        FundingProject(
-          id: '1',
-          title: 'Fund 1',
-          description: 'First funding project for environmental protection.',
-          targetAmount: 1000000,
-          currentAmount: 750000,
-          daysLeft: 15,
-          imageUrl: null,
-          createdAt: DateTime.now().subtract(const Duration(days: 5)),
-          creatorUid: 'user1',
-          creatorName: 'Environmental Guardian',
-        ),
-        FundingProject(
-          id: '2',
-          title: 'Fund 2',
-          description: 'Funding for recycling project.',
-          targetAmount: 500000,
-          currentAmount: 300000,
-          daysLeft: 8,
-          imageUrl: null,
-          createdAt: DateTime.now().subtract(const Duration(days: 2)),
-          creatorUid: 'user2',
-          creatorName: 'Recycling King',
-        ),
-        FundingProject(
-          id: '3',
-          title: 'Fund 3',
-          description: 'Project for eco-friendly product development.',
-          targetAmount: 2000000,
-          currentAmount: 1200000,
-          daysLeft: 25,
-          imageUrl: null,
-          createdAt: DateTime.now().subtract(const Duration(days: 10)),
-          creatorUid: 'user3',
-          creatorName: 'GreenTech',
-        ),
-      ];
+      return projectsData.map((data) => FundingProject.fromMap(data, data['id'])).toList();
     } catch (e) {
       throw Exception('Failed to load funding projects: $e');
     }

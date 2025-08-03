@@ -34,7 +34,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         _passwordController.text,
       );
       
-      // 로그인 성공 후 사용자 정보 디버깅
+      // Debug user info after successful login
       final user = EcoBackend.instance.currentUser;
       print('=== LOGIN SUCCESS DEBUG ===');
       print('UID: ${user?.uid}');
@@ -42,7 +42,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       print('DisplayName: ${user?.displayName}');
       print('===========================');
       
-      // 로그인 성공 후 자동 리그 참여
+      // Auto league participation after successful login
       await EcoBackend.instance.ensureUserInLeague();
       if (mounted) {
         context.go('/');
@@ -50,7 +50,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('로그인 실패: ${e.toString()}')),
+          SnackBar(content: Text('Login failed: ${e.toString()}')),
         );
       }
     } finally {
@@ -64,7 +64,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     try {
       await EcoBackend.instance.signInWithGoogle();
       
-      // Google 로그인 성공 후 사용자 정보 디버깅
+      // Debug user info after successful Google login
       final user = EcoBackend.instance.currentUser;
       print('=== GOOGLE LOGIN SUCCESS DEBUG ===');
       print('UID: ${user?.uid}');
@@ -72,7 +72,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       print('DisplayName: ${user?.displayName}');
       print('===================================');
       
-      // 로그인 성공 후 자동 리그 참여
+      // Auto league participation after successful login
       await EcoBackend.instance.ensureUserInLeague();
       if (mounted) {
         context.go('/');
@@ -80,7 +80,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Google 로그인 실패: ${e.toString()}')),
+          SnackBar(content: Text('Google login failed: ${e.toString()}')),
         );
       }
     } finally {
@@ -127,7 +127,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
                 const SizedBox(height: 8),
                 const Text(
-                  '환경을 사랑하는 당신의 디지털 정원',
+                  'Your digital garden for loving the environment',
                   style: TextStyle(
                     fontSize: 16,
                     color: Colors.grey,
@@ -140,7 +140,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
                   decoration: InputDecoration(
-                    labelText: '이메일',
+                    labelText: 'Email',
                     hintText: 'example@email.com',
                     prefixIcon: const Icon(Icons.email_outlined),
                     border: OutlineInputBorder(
@@ -151,10 +151,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
-                      return '이메일을 입력해주세요';
+                      return 'Please enter your email';
                     }
                     if (!value.contains('@')) {
-                      return '올바른 이메일 형식을 입력해주세요';
+                      return 'Please enter a valid email format';
                     }
                     return null;
                   },
@@ -165,7 +165,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   controller: _passwordController,
                   obscureText: true,
                   decoration: InputDecoration(
-                    labelText: '비밀번호',
+                    labelText: 'Password',
                     prefixIcon: const Icon(Icons.lock_outlined),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -175,10 +175,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
-                      return '비밀번호를 입력해주세요';
+                      return 'Please enter your password';
                     }
                     if (value.length < 6) {
-                      return '비밀번호는 6자 이상이어야 합니다';
+                      return 'Password must be at least 6 characters';
                     }
                     return null;
                   },
@@ -205,7 +205,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           ),
                         )
                       : const Text(
-                          '로그인',
+                          'Login',
                           style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                         ),
                 ),
@@ -217,7 +217,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: Text(
-                        '또는',
+                        'OR',
                         style: TextStyle(color: Colors.grey[600]),
                       ),
                     ),
@@ -239,7 +239,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                   ),
                   label: const Text(
-                    'Google로 로그인',
+                    'Sign in with Google',
                     style: TextStyle(fontSize: 16),
                   ),
                   style: OutlinedButton.styleFrom(
@@ -255,13 +255,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Text('계정이 없으신가요? '),
+                    const Text('Don\'t have an account? '),
                     TextButton(
                       onPressed: () {
                         // TODO: Navigate to sign up screen
                       },
                       child: const Text(
-                        '회원가입',
+                        'Sign Up',
                         style: TextStyle(
                           color: Colors.green,
                           fontWeight: FontWeight.bold,

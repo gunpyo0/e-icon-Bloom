@@ -22,7 +22,7 @@ class ProfileScreen extends ConsumerWidget {
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
-        title: const Text('내 프로필'),
+        title: const Text('My Profile'),
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
         elevation: 0.5,
@@ -34,7 +34,7 @@ class ProfileScreen extends ConsumerWidget {
           IconButton(
             icon: const Icon(Icons.bug_report),
             onPressed: () => context.push('/debug'),
-            tooltip: '디버그 페이지',
+            tooltip: 'Debug Page',
           ),
           IconButton(
             icon: const Icon(Icons.logout),
@@ -118,7 +118,7 @@ class ProfileScreen extends ConsumerWidget {
               data: (profile) => Column(
                 children: [
                   Text(
-                    profile['displayName'] ?? profile['email'] ?? '사용자',
+                    profile['displayName'] ?? profile['email'] ?? 'User',
                     style: const TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
@@ -137,7 +137,7 @@ class ProfileScreen extends ConsumerWidget {
               loading: () => const Column(
                 children: [
                   Text(
-                    '로딩 중...',
+                    'Loading...',
                     style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                   ),
                 ],
@@ -145,7 +145,7 @@ class ProfileScreen extends ConsumerWidget {
               error: (error, _) => Column(
                 children: [
                   const Text(
-                    '프로필 로드 실패',
+                    'Profile Load Failed',
                     style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 4),
@@ -173,7 +173,7 @@ class ProfileScreen extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              '내 활동',
+              'My Activities',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
@@ -183,19 +183,19 @@ class ProfileScreen extends ConsumerWidget {
             profileAsync.when(
               data: (profile) => Column(
                 children: [
-                  _buildStatRow('총 포인트', '${profile['totalPoints'] ?? 0} P'),
+                  _buildStatRow('Total Points', '${profile['totalPoints'] ?? 0} P'),
                   const SizedBox(height: 12),
-                  _buildStatRow('교육 포인트', '${profile['eduPoints'] ?? 0} P'),
+                  _buildStatRow('Education Points', '${profile['eduPoints'] ?? 0} P'),
                   const SizedBox(height: 12),
-                  _buildStatRow('실천 포인트', '${profile['jobPoints'] ?? 0} P'),
+                  _buildStatRow('Action Points', '${profile['jobPoints'] ?? 0} P'),
                   const SizedBox(height: 12),
-                  _buildStatRow('완료한 레슨', '${profile['completedLessons'] ?? 0}개'),
+                  _buildStatRow('Completed Lessons', '${profile['completedLessons'] ?? 0}'),
                 ],
               ),
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (error, _) => Center(
                 child: Text(
-                  '데이터를 불러올 수 없습니다',
+                  'Unable to load data',
                   style: TextStyle(color: Colors.red[600]),
                 ),
               ),
@@ -216,7 +216,7 @@ class ProfileScreen extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              '소속 리그',
+              'League Membership',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
@@ -225,36 +225,36 @@ class ProfileScreen extends ConsumerWidget {
             const SizedBox(height: 16),
             leagueAsync.when(
               data: (league) {
-                // leagueId가 있으면 참여 중, 없으면 미참여
+                // If leagueId exists, participating; if not, not participating
                 final hasLeague = league['leagueId'] != null;
                 final leagueInfo = league['league'] as Map<String, dynamic>?;
                 
                 if (!hasLeague) {
                   return Column(
                     children: [
-                      _buildStatRow('리그명', '미참여'),
+                      _buildStatRow('League Name', 'Not Participating'),
                       const SizedBox(height: 12),
-                      _buildStatRow('내 순위', '-'),
+                      _buildStatRow('My Rank', '-'),
                       const SizedBox(height: 12),
-                      _buildStatRow('총 참여자', '-'),
+                      _buildStatRow('Total Participants', '-'),
                     ],
                   );
                 }
                 
                 return Column(
                   children: [
-                    _buildStatRow('리그명', 'League S${leagueInfo?['stage'] ?? 1}L${leagueInfo?['index'] ?? 1}'),
+                    _buildStatRow('League Name', 'League S${leagueInfo?['stage'] ?? 1}L${leagueInfo?['index'] ?? 1}'),
                     const SizedBox(height: 12),
-                    _buildStatRow('내 순위', '#${league['rank'] ?? 0}'),
+                    _buildStatRow('My Rank', '#${league['rank'] ?? 0}'),
                     const SizedBox(height: 12),
-                    _buildStatRow('총 참여자', '${leagueInfo?['memberCount'] ?? 0}명'),
+                    _buildStatRow('Total Participants', '${leagueInfo?['memberCount'] ?? 0}'),
                   ],
                 );
               },
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (error, _) => Center(
                 child: Text(
-                  '리그 정보를 불러올 수 없습니다',
+                  'Unable to load league information',
                   style: TextStyle(color: Colors.red[600]),
                 ),
               ),
@@ -297,7 +297,7 @@ class ProfileScreen extends ConsumerWidget {
               // TODO: Navigate to settings
             },
             icon: const Icon(Icons.settings),
-            label: const Text('설정'),
+            label: const Text('Settings'),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.grey[100],
               foregroundColor: Colors.black,
@@ -316,7 +316,7 @@ class ProfileScreen extends ConsumerWidget {
               // TODO: Navigate to my garden
             },
             icon: const Icon(Icons.yard),
-            label: const Text('내 정원 보기'),
+            label: const Text('View My Garden'),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.green,
               foregroundColor: Colors.white,
@@ -335,12 +335,12 @@ class ProfileScreen extends ConsumerWidget {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('로그아웃'),
-        content: const Text('정말 로그아웃하시겠습니까?'),
+        title: const Text('Logout'),
+        content: const Text('Are you sure you want to logout?'),
         actions: [
           TextButton(
             onPressed: () => context.pop(),
-            child: const Text('취소'),
+            child: const Text('Cancel'),
           ),
           TextButton(
             onPressed: () async {
@@ -350,7 +350,7 @@ class ProfileScreen extends ConsumerWidget {
               }
             },
             child: const Text(
-              '로그아웃',
+              'Logout',
               style: TextStyle(color: Colors.red),
             ),
           ),

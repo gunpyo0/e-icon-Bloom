@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'fund_viewmodel.dart';
+import 'package:bloom/providers/points_provider.dart';
 
 class FundScreen extends ConsumerWidget {
   const FundScreen({super.key});
@@ -13,18 +14,119 @@ class FundScreen extends ConsumerWidget {
     
     return Column(
       children: [
-        // 필터 버튼들
+        // Points information header
+        _buildPointsHeader(context, ref),
+        
+        // Filter buttons
         _buildFilterButtons(context, ref),
         
-        // 펀딩 리스트
+        // Funding list
         Expanded(
-          child: selectedFilter == FilterType.sort
-              ? _buildSortedFundingList(context, ref.watch(sortedFundingProjectsProvider))
-              : selectedFilter == FilterType.search
-                  ? _buildSearchResults(context, ref, ref.watch(filteredFundingProjectsProvider))
-                  : _buildFilteredFundingList(context, ref.watch(filteredFundingProjectsProvider)),
+          child: RefreshIndicator(
+            onRefresh: () async {
+              ref.read(pointsProvider.notifier).refresh();
+              ref.invalidate(fundViewModelProvider);
+              await ref.read(fundViewModelProvider.notifier).refresh();
+            },
+            child: selectedFilter == FilterType.sort
+                ? _buildSortedFundingList(context, ref.watch(sortedFundingProjectsProvider))
+                : selectedFilter == FilterType.search
+                    ? _buildSearchResults(context, ref, ref.watch(filteredFundingProjectsProvider))
+                    : _buildFilteredFundingList(context, ref.watch(filteredFundingProjectsProvider)),
+          ),
         ),
       ],
+    );
+  }
+
+  Widget _buildPointsHeader(BuildContext context, WidgetRef ref) {
+    final pointsAsync = ref.watch(pointsProvider);
+    
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.green.shade50,
+        border: Border(
+          bottom: BorderSide(color: Colors.green.shade200, width: 1),
+        ),
+      ),
+      child: pointsAsync.when(
+        data: (totalPoints) {
+          return Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.green,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.account_balance_wallet,
+                  color: Colors.white,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'My Points',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  Text(
+                    '${totalPoints} P',
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.green,
+                    ),
+                  ),
+                ],
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.green.shade300),
+                ),
+                child: const Text(
+                  'Fund with your points!',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.green,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+        loading: () => const Center(
+          child: SizedBox(
+            height: 20,
+            width: 20,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+        error: (error, _) => Row(
+          children: [
+            const Icon(Icons.error, color: Colors.red, size: 20),
+            const SizedBox(width: 8),
+            Text(
+              'Unable to load point information',
+              style: TextStyle(color: Colors.red.shade600, fontSize: 12),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -56,7 +158,7 @@ class FundScreen extends ConsumerWidget {
               ),
             ],
           ),
-          // Search 버튼이 선택되었을 때만 검색 입력 필드 표시
+          // Show search input field only when Search button is selected
           if (selectedFilter == FilterType.search) ...[
             const SizedBox(height: 12),
             _buildSearchInput(context, ref),
@@ -388,7 +490,7 @@ class FundScreen extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 검색 결과 헤더
+        // Search results header
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
           child: Text(
@@ -574,7 +676,7 @@ class FundScreen extends ConsumerWidget {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        '${project.currentAmount.toStringAsFixed(0)} KRW',
+                        '${project.currentAmount.toStringAsFixed(0)} Points',
                         style: const TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.bold,
@@ -816,7 +918,7 @@ class FundScreen extends ConsumerWidget {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        '${project.currentAmount.toStringAsFixed(0)} KRW',
+                        '${project.currentAmount.toStringAsFixed(0)} Points',
                         style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
@@ -836,7 +938,7 @@ class FundScreen extends ConsumerWidget {
                   const SizedBox(height: 4),
                   
                   Text(
-                    'Goal: ${project.targetAmount.toStringAsFixed(0)} KRW',
+                    'Goal: ${project.targetAmount.toStringAsFixed(0)} Points',
                     style: TextStyle(
                       fontSize: 14,
                       color: Colors.grey[600],

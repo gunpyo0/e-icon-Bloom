@@ -3,6 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:bloom/data/models/crop.dart';
 import 'package:bloom/data/services/eco_backend.dart';
 import 'package:bloom/ui/screens/garden/flame_garden_widget.dart';
+import 'package:bloom/ui/screens/garden/garden_screen.dart';
+import 'package:bloom/ui/screens/profile/profile_screen.dart';
+import 'package:bloom/providers/points_provider.dart';
 import 'package:go_router/go_router.dart';
 
 class MainScreen extends ConsumerStatefulWidget {
@@ -12,34 +15,46 @@ class MainScreen extends ConsumerStatefulWidget {
   ConsumerState<MainScreen> createState() => _MainScreenState();
 }
 
-class _MainScreenState extends ConsumerState<MainScreen> {
-  Garden? garden;
-  int userPoints = 0;
+class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObserver, AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => false; // 화면이 재생성되도록 함
   int userRank = 0;
   bool isLoading = true;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadData();
+    
+    // 포인트 초기 로드
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(pointsProvider.notifier).refresh();
+    });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.resumed) {
+      // 앱이 포그라운드로 돌아올 때 포인트 새로고침
+      ref.read(pointsProvider.notifier).refresh();
+    }
   }
 
   Future<void> _loadData() async {
     try {
-      // 병렬로 데이터 로드
-      final results = await Future.wait<dynamic>([
-        EcoBackend.instance.myGarden(),
-        EcoBackend.instance.getUserPoints(),
-        EcoBackend.instance.getUserRank(),
-      ]);
-
-      // myGarden()은 Map<String, dynamic>을 반환하므로 Garden으로 변환
-      final gardenData = results[0] as Map<String, dynamic>;
+      // Load user rank
+      final rank = await EcoBackend.instance.getUserRank();
       
       setState(() {
-        garden = Garden.fromJson(gardenData);
-        userPoints = results[1] as int;
-        userRank = results[2] as int;
+        userRank = rank;
         isLoading = false;
       });
     } catch (e) {
@@ -52,16 +67,34 @@ class _MainScreenState extends ConsumerState<MainScreen> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // AutomaticKeepAliveClientMixin 필요
+    
+    final pointsAsync = ref.watch(pointsProvider);
+    final gardenAsync = ref.watch(gardenProvider);
+    
+    // 디버그: 포인트 상태 로그
+    pointsAsync.when(
+      data: (points) => print('MainScreen - Points: $points'),
+      loading: () => print('MainScreen - Points loading'),
+      error: (error, _) => print('MainScreen - Points error: $error'),
+    );
+    
     return Scaffold(
       backgroundColor: Colors.green.shade50,
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
+          : RefreshIndicator(
+              onRefresh: () async {
+                await ref.read(pointsProvider.notifier).refresh();
+                ref.refresh(gardenProvider);
+                await _loadData();
+              },
+              child: SingleChildScrollView(
               padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // 환영 메시지
+                  // Welcome message
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(20),
@@ -84,7 +117,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          '안녕하세요! 🌱',
+                          'Hello! 🌱',
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: 24,
@@ -93,7 +126,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          '오늘도 정원을 가꿔보세요',
+                          'Take care of your garden today',
                           style: TextStyle(
                             color: Colors.white.withOpacity(0.9),
                             fontSize: 16,
@@ -105,7 +138,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
                   
                   const SizedBox(height: 24),
                   
-                  // 랭킹 정보
+                  // Ranking information
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(16),
@@ -140,14 +173,14 @@ class _MainScreenState extends ConsumerState<MainScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                '현재 랭킹',
+                                'Current Ranking',
                                 style: TextStyle(
                                   color: Colors.grey.shade600,
                                   fontSize: 14,
                                 ),
                               ),
                               Text(
-                                '$userRank위',
+                                'Rank $userRank',
                                 style: const TextStyle(
                                   fontSize: 24,
                                   fontWeight: FontWeight.bold,
@@ -159,9 +192,9 @@ class _MainScreenState extends ConsumerState<MainScreen> {
                         ),
                         TextButton(
                           onPressed: () {
-                            // 랭킹 화면으로 이동
+                            // Navigate to ranking screen
                           },
-                          child: const Text('자세히'),
+                          child: const Text('View More'),
                         ),
                       ],
                     ),
@@ -169,63 +202,139 @@ class _MainScreenState extends ConsumerState<MainScreen> {
                   
                   const SizedBox(height: 24),
                   
-                  // 정원 섹션 헤더 (제목 + 재화)
+                  // Garden section header (title + currency)
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        '내 정원',
+                        'My Garden',
                         style: TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
                           color: Colors.grey.shade800,
                         ),
                       ),
-                      // 재화 표시
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: Colors.amber.shade100,
-                          borderRadius: BorderRadius.circular(25),
-                          border: Border.all(color: Colors.amber.shade300, width: 1.5),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.amber.withOpacity(0.2),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
+                      // Currency display
+                      GestureDetector(
+                        onTap: () {
+                          // 포인트 표시를 탭하면 새로고침
+                          ref.read(pointsProvider.notifier).refresh();
+                        },
+                        child: pointsAsync.when(
+                          data: (totalPoints) {
+                            return Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: Colors.amber.shade100,
+                              borderRadius: BorderRadius.circular(25),
+                              border: Border.all(color: Colors.amber.shade300, width: 1.5),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.amber.withOpacity(0.2),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
                             ),
-                          ],
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.monetization_on, color: Colors.amber.shade700, size: 22),
+                                const SizedBox(width: 6),
+                                Text(
+                                  '$totalPoints',
+                                  style: TextStyle(
+                                    color: Colors.amber.shade700,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'P',
+                                  style: TextStyle(
+                                    color: Colors.amber.shade600,
+                                    fontWeight: FontWeight.w500,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                        loading: () => Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.amber.shade100,
+                            borderRadius: BorderRadius.circular(25),
+                            border: Border.all(color: Colors.amber.shade300, width: 1.5),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.monetization_on, color: Colors.amber.shade700, size: 22),
+                              const SizedBox(width: 6),
+                              SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.amber.shade700),
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                'P',
+                                style: TextStyle(
+                                  color: Colors.amber.shade600,
+                                  fontWeight: FontWeight.w500,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.monetization_on, color: Colors.amber.shade700, size: 22),
-                            const SizedBox(width: 6),
-                            Text(
-                              '$userPoints',
-                              style: TextStyle(
-                                color: Colors.amber.shade700,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
+                        error: (_, __) => Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.red.shade100,
+                            borderRadius: BorderRadius.circular(25),
+                            border: Border.all(color: Colors.red.shade300, width: 1.5),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.error, color: Colors.red.shade700, size: 22),
+                              const SizedBox(width: 6),
+                              Text(
+                                '0',
+                                style: TextStyle(
+                                  color: Colors.red.shade700,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
                               ),
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              'P',
-                              style: TextStyle(
-                                color: Colors.amber.shade600,
-                                fontWeight: FontWeight.w500,
-                                fontSize: 14,
+                              const SizedBox(width: 4),
+                              Text(
+                                'P',
+                                style: TextStyle(
+                                  color: Colors.red.shade600,
+                                  fontWeight: FontWeight.w500,
+                                  fontSize: 14,
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
+                        ),
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 12),
                   
-                  if (garden != null)
+                  // Garden section
+                  gardenAsync.when(
+                    data: (garden) =>
                     Container(
                       decoration: BoxDecoration(
                         color: Colors.white,
@@ -242,15 +351,18 @@ class _MainScreenState extends ConsumerState<MainScreen> {
                         borderRadius: BorderRadius.circular(20),
                         child: Stack(
                           children: [
-                            // 정원 미리보기 (축소된 버전)
+                            // Garden preview (scaled down version)
                             SizedBox(
                               height: 200,
                               child: FlameGardenWidget(
-                                garden: garden!,
-                                onRefresh: _loadData,
+                                garden: garden,
+                                onRefresh: () {
+                                  ref.refresh(gardenProvider);
+                                  ref.read(pointsProvider.notifier).refresh();
+                                },
                               ),
                             ),
-                            // 클릭 오버레이
+                            // Click overlay
                             Positioned.fill(
                               child: Material(
                                 color: Colors.transparent,
@@ -290,7 +402,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
                                             ),
                                             const SizedBox(width: 8),
                                             Text(
-                                              '정원 보기',
+                                              'View Garden',
                                               style: TextStyle(
                                                 color: Colors.green.shade600,
                                                 fontWeight: FontWeight.bold,
@@ -308,17 +420,67 @@ class _MainScreenState extends ConsumerState<MainScreen> {
                         ),
                       ),
                     ),
+                    loading: () => Container(
+                      height: 200,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            blurRadius: 15,
+                            offset: const Offset(0, 5),
+                          ),
+                        ],
+                      ),
+                      child: const Center(
+                        child: CircularProgressIndicator(),
+                      ),
+                    ),
+                    error: (error, stack) => Container(
+                      height: 200,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            blurRadius: 15,
+                            offset: const Offset(0, 5),
+                          ),
+                        ],
+                      ),
+                      child: Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.error_outline, size: 48, color: Colors.red[300]),
+                            const SizedBox(height: 16),
+                            Text(
+                              'Cannot load garden',
+                              style: TextStyle(fontSize: 16, color: Colors.red[600]),
+                            ),
+                            const SizedBox(height: 16),
+                            ElevatedButton(
+                              onPressed: () => ref.refresh(gardenProvider),
+                              child: const Text('Retry'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
                   
                   const SizedBox(height: 24),
                   
-                  // 빠른 액션 버튼들
+                  // Quick action buttons
                   Row(
                     children: [
                       Expanded(
                         child: _buildQuickActionCard(
                           icon: Icons.eco,
-                          title: '정원',
-                          subtitle: '작물 키우기',
+                          title: 'Garden',
+                          subtitle: 'Grow Crops',
                           color: Colors.green,
                           onTap: () => context.push('/garden'),
                         ),
@@ -327,8 +489,8 @@ class _MainScreenState extends ConsumerState<MainScreen> {
                       Expanded(
                         child: _buildQuickActionCard(
                           icon: Icons.school,
-                          title: '학습',
-                          subtitle: '환경 지식',
+                          title: 'Learn',
+                          subtitle: 'Environmental Knowledge',
                           color: Colors.blue,
                           onTap: () => context.push('/learn'),
                         ),
@@ -343,8 +505,8 @@ class _MainScreenState extends ConsumerState<MainScreen> {
                       Expanded(
                         child: _buildQuickActionCard(
                           icon: Icons.favorite,
-                          title: '펀딩',
-                          subtitle: '환경 후원',
+                          title: 'Funding',
+                          subtitle: 'Environmental Support',
                           color: Colors.red,
                           onTap: () => context.push('/fund'),
                         ),
@@ -353,8 +515,8 @@ class _MainScreenState extends ConsumerState<MainScreen> {
                       Expanded(
                         child: _buildQuickActionCard(
                           icon: Icons.info,
-                          title: '정보',
-                          subtitle: '환경 뉴스',
+                          title: 'Info',
+                          subtitle: 'Environmental News',
                           color: Colors.orange,
                           onTap: () => context.push('/info'),
                         ),
@@ -364,6 +526,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
                 ],
               ),
             ),
+          ),
     );
   }
   

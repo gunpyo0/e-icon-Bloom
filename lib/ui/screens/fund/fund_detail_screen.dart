@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'fund_viewmodel.dart';
+import 'package:bloom/data/services/eco_backend.dart';
+import 'package:bloom/providers/points_provider.dart';
 
 class FundDetailScreen extends ConsumerWidget {
   final String fundId;
@@ -35,7 +37,7 @@ class FundDetailScreen extends ConsumerWidget {
           IconButton(
             icon: const Icon(Icons.share, color: Colors.black),
             onPressed: () {
-              // 공유 기능
+              // Share functionality
             },
           ),
         ],
@@ -203,7 +205,7 @@ class FundDetailScreen extends ConsumerWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '${project.currentAmount.toStringAsFixed(0)} KRW',
+                    '${project.currentAmount.toStringAsFixed(0)} Points',
                     style: const TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
@@ -238,7 +240,7 @@ class FundDetailScreen extends ConsumerWidget {
           const SizedBox(height: 12),
           
           Text(
-            'Target Amount: ${project.targetAmount.toStringAsFixed(0)} KRW',
+            'Target Amount: ${project.targetAmount.toStringAsFixed(0)} Points',
             style: TextStyle(
               fontSize: 16,
               color: Colors.grey[600],
@@ -296,7 +298,7 @@ class FundDetailScreen extends ConsumerWidget {
         height: 56,
         child: ElevatedButton(
           onPressed: () {
-            // 펀딩 참여 기능
+            // Funding participation functionality
             _showFundingDialog(context, project);
           },
           style: ElevatedButton.styleFrom(
@@ -322,31 +324,229 @@ class FundDetailScreen extends ConsumerWidget {
   void _showFundingDialog(BuildContext context, FundingProject project) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Participate in Funding'),
-        content: Text('Would you like to fund the ${project.title} project?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Funding participation completed!'),
-                  backgroundColor: Colors.green,
-                ),
-              );
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Participate'),
+      builder: (context) => _FundingDialog(project: project),
+    );
+  }
+}
+
+class _FundingDialog extends ConsumerStatefulWidget {
+  final FundingProject project;
+  
+  const _FundingDialog({required this.project});
+
+  @override
+  ConsumerState<_FundingDialog> createState() => _FundingDialogState();
+}
+
+class _FundingDialogState extends ConsumerState<_FundingDialog> {
+  final TextEditingController _amountController = TextEditingController();
+  bool _isLoading = false;
+
+  @override
+  void dispose() {
+    _amountController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final pointsAsync = ref.watch(pointsProvider);
+    
+    return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: Column(
+        children: [
+          const Icon(Icons.monetization_on, color: Colors.green, size: 32),
+          const SizedBox(height: 8),
+          Text(
+            'Fund with Points',
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
           ),
         ],
+      ),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              widget.project.title,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 16),
+            
+            pointsAsync.when(
+              data: (totalPoints) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.green.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.green.shade200),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.account_balance_wallet, color: Colors.green),
+                          const SizedBox(width: 8),
+                          Text(
+                            'My Points: ${totalPoints.toString()} P',
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.green,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    
+                    const Text(
+                      'Points to Fund',
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _amountController,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        hintText: 'Enter points to fund',
+                        suffixText: 'P',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(color: Colors.green),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    
+                    // Quick selection buttons
+                    Wrap(
+                      spacing: 8,
+                      children: [100, 500, 1000, totalPoints ~/ 2, totalPoints]
+                          .where((amount) => amount > 0 && amount <= totalPoints)
+                          .map((amount) => GestureDetector(
+                            onTap: () => _amountController.text = amount.toString(),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: Colors.grey.shade100,
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: Colors.grey.shade300),
+                              ),
+                              child: Text(
+                                '${amount}P',
+                                style: const TextStyle(fontSize: 12),
+                              ),
+                            ),
+                          ))
+                          .toList(),
+                    ),
+                  ],
+                );
+              },
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (error, _) => Text('Unable to load point information: $error'),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: _isLoading
+              ? null
+              : () => _handleFunding(context),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.green,
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
+          child: _isLoading
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
+                )
+              : const Text('Fund'),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _handleFunding(BuildContext context) async {
+    final amountText = _amountController.text.trim();
+    if (amountText.isEmpty) {
+      _showSnackBar(context, '펀딩할 포인트를 입력해주세요', Colors.red);
+      return;
+    }
+
+    final amount = int.tryParse(amountText);
+    if (amount == null || amount <= 0) {
+      _showSnackBar(context, '올바른 포인트를 입력해주세요', Colors.red);
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      final pointsState = ref.read(pointsProvider);
+      final totalPoints = pointsState.value ?? 0;
+      
+      if (amount > totalPoints) {
+        _showSnackBar(context, '보유 포인트가 부족합니다', Colors.red);
+        return;
+      }
+
+      // 포인트로 펀딩하기
+      await EcoBackend.instance.fundWithPoints(widget.project.id, amount);
+      
+      // 포인트 상태를 즉시 업데이트 (UI 빠른 반응용)
+      ref.read(pointsProvider.notifier).subtractPoints(amount);
+      
+      // 펀딩 프로젝트 목록 새로고침
+      ref.refresh(fundViewModelProvider);
+      await ref.read(fundViewModelProvider.notifier).refresh();
+      
+      // 실제 포인트 새로고침 (정확한 값 확인용)
+      await ref.read(pointsProvider.notifier).refresh();
+      
+      if (context.mounted) {
+        Navigator.of(context).pop();
+        _showSnackBar(context, '${amount}P로 펀딩이 완료되었습니다!', Colors.green);
+      }
+    } catch (e) {
+      if (context.mounted) {
+        _showSnackBar(context, '펀딩 처리 중 오류가 발생했습니다: $e', Colors.red);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+
+  void _showSnackBar(BuildContext context, String message, Color color) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: color,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
     );
   }

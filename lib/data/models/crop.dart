@@ -31,21 +31,21 @@ class Crop {
       type: CropType.carrot,
       cost: [3, 4, 5],
       reward: 15,
-      displayName: '당근',
+      displayName: 'Carrot',
       icon: '🥕',
     ),
     CropType.tomato: Crop(
       type: CropType.tomato,
       cost: [5, 6, 8],
       reward: 25,
-      displayName: '토마토',
+      displayName: 'Tomato',
       icon: '🍅',
     ),
     CropType.pumpkin: Crop(
       type: CropType.pumpkin,
       cost: [7, 9, 12],
       reward: 35,
-      displayName: '호박',
+      displayName: 'Pumpkin',
       icon: '🎃',
     ),
   };
@@ -199,13 +199,32 @@ class Garden {
     print('Raw JSON: $json');
     print('size field: ${json['size']} (type: ${json['size'].runtimeType})');
     print('point field: ${json['point']} (type: ${json['point'].runtimeType})');
+    print('tiles field: ${json['tiles']} (type: ${json['tiles'].runtimeType})');
     
     // 안전한 타입 변환
     final size = _safeInt(json['size']) ?? 3;
     final playerPoints = _safeInt(json['point']) ?? 0;
-    final tilesData = json['tiles'] as Map<String, dynamic>? ?? {};
     
-    print('Converted size: $size, points: $playerPoints');
+    // tiles 데이터 안전하게 변환
+    Map<String, dynamic> tilesData = {};
+    final rawTiles = json['tiles'];
+    
+    if (rawTiles != null) {
+      try {
+        if (rawTiles is Map<String, dynamic>) {
+          tilesData = rawTiles;
+        } else if (rawTiles is Map) {
+          // LinkedMap 등 다른 Map 타입을 안전하게 변환
+          tilesData = Map<String, dynamic>.from(rawTiles);
+        }
+        print('Tiles data converted successfully: ${tilesData.keys}');
+      } catch (e) {
+        print('Error converting tiles data: $e');
+        tilesData = {};
+      }
+    }
+    
+    print('Converted size: $size, points: $playerPoints, tiles count: ${tilesData.length}');
     print('=============================');
 
     List<List<GardenTile>> tiles = List.generate(
@@ -214,10 +233,25 @@ class Garden {
         size,
         (x) {
           final tileKey = '$x,$y';
-          final tileData = tilesData[tileKey] as Map<String, dynamic>?;
+          final rawTileData = tilesData[tileKey];
           
-          if (tileData != null) {
-            return GardenTile.fromJson(tileData, x, y);
+          if (rawTileData != null) {
+            try {
+              Map<String, dynamic> tileData;
+              if (rawTileData is Map<String, dynamic>) {
+                tileData = rawTileData;
+              } else if (rawTileData is Map) {
+                tileData = Map<String, dynamic>.from(rawTileData);
+              } else {
+                print('Unexpected tile data type: ${rawTileData.runtimeType}');
+                return GardenTile(x: x, y: y, stage: CropStage.empty);
+              }
+              
+              return GardenTile.fromJson(tileData, x, y);
+            } catch (e) {
+              print('Error parsing tile at ($x,$y): $e');
+              return GardenTile(x: x, y: y, stage: CropStage.empty);
+            }
           } else {
             return GardenTile(x: x, y: y, stage: CropStage.empty);
           }
