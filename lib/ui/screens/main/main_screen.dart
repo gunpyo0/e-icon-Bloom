@@ -50,8 +50,9 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
 
   Future<void> _loadData() async {
     try {
-      // Load user rank
-      final rank = await EcoBackend.instance.getUserRank();
+      // Load user league rank (consistent with profile screen)
+      final leagueData = await EcoBackend.instance.myLeague();
+      final rank = leagueData['rank'] ?? 0;
       
       setState(() {
         userRank = rank;
@@ -60,6 +61,7 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
     } catch (e) {
       print('Error loading data: $e');
       setState(() {
+        userRank = 0;
         isLoading = false;
       });
     }

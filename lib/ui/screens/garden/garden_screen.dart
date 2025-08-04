@@ -264,17 +264,22 @@ class _GardenScreenState extends ConsumerState<GardenScreen> with SingleTickerPr
                     size: 16,
                   ),
                   const SizedBox(width: 4),
-                  profileAsync.when(
-                    data: (profile) => Text(
-                      '${profile['totalPoints'] ?? 0} P',
-                      style: TextStyle(
-                        color: Colors.green[700],
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                      ),
-                    ),
-                    loading: () => const Text('... P', style: TextStyle(fontSize: 14)),
-                    error: (_, __) => const Text('0 P', style: TextStyle(fontSize: 14)),
+                  Consumer(
+                    builder: (context, ref, child) {
+                      final pointsAsync = ref.watch(pointsProvider);
+                      return pointsAsync.when(
+                        data: (points) => Text(
+                          '$points P',
+                          style: TextStyle(
+                            color: Colors.green[700],
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                        loading: () => const Text('... P', style: TextStyle(fontSize: 14)),
+                        error: (_, __) => const Text('0 P', style: TextStyle(fontSize: 14)),
+                      );
+                    },
                   ),
                 ],
               ),
@@ -1195,12 +1200,13 @@ class _GardenScreenState extends ConsumerState<GardenScreen> with SingleTickerPr
             mainAxisSize: MainAxisSize.min,
             children: [
               // 현재 포인트 표시
-              profileAsync.when(
-                data: (profile) {
-                  final totalPoints = profile['totalPoints'] ?? 0;
-                  return Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
+              Consumer(
+                builder: (context, ref, child) {
+                  final pointsAsync = ref.watch(pointsProvider);
+                  return pointsAsync.when(
+                    data: (totalPoints) => Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
                       color: Colors.green.shade50,
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(color: Colors.green.shade200),
@@ -1218,10 +1224,29 @@ class _GardenScreenState extends ConsumerState<GardenScreen> with SingleTickerPr
                         ),
                       ],
                     ),
+                    ),
+                    loading: () => Container(
+                      padding: const EdgeInsets.all(12),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.account_balance_wallet, color: Colors.green, size: 20),
+                          SizedBox(width: 8),
+                          Text('Points: ... P', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green)),
+                        ],
+                      ),
+                    ),
+                    error: (_, __) => Container(
+                      padding: const EdgeInsets.all(12),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.account_balance_wallet, color: Colors.green, size: 20),
+                          SizedBox(width: 8),
+                          Text('Points: 0 P', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green)),
+                        ],
+                      ),
+                    ),
                   );
                 },
-                loading: () => const CircularProgressIndicator(),
-                error: (_, __) => const Text('Cannot load points'),
               ),
               const SizedBox(height: 16),
               
@@ -1229,10 +1254,12 @@ class _GardenScreenState extends ConsumerState<GardenScreen> with SingleTickerPr
               ...Crop.crops.values.map((crop) {
                 final plantCost = crop.cost[0];
                 
-                return profileAsync.when(
-                  data: (profile) {
-                    final totalPoints = profile['totalPoints'] ?? 0;
-                    final canAfford = totalPoints >= plantCost;
+                return Consumer(
+                  builder: (context, ref, child) {
+                    final pointsAsync = ref.watch(pointsProvider);
+                    return pointsAsync.when(
+                      data: (totalPoints) {
+                        final canAfford = totalPoints >= plantCost;
                     
                     return Container(
                       margin: const EdgeInsets.only(bottom: 8),
@@ -1278,18 +1305,20 @@ class _GardenScreenState extends ConsumerState<GardenScreen> with SingleTickerPr
                         ),
                       ),
                     );
+                      },
+                      loading: () => ListTile(
+                        leading: Text(crop.icon, style: const TextStyle(fontSize: 28)),
+                        title: Text(crop.displayName),
+                        subtitle: Text('${plantCost} P'),
+                      ),
+                      error: (_, __) => ListTile(
+                        leading: Text(crop.icon, style: const TextStyle(fontSize: 28)),
+                        title: Text(crop.displayName),
+                        subtitle: Text('${plantCost} P'),
+                        enabled: false,
+                      ),
+                    );
                   },
-                  loading: () => ListTile(
-                    leading: Text(crop.icon, style: const TextStyle(fontSize: 28)),
-                    title: Text(crop.displayName),
-                    subtitle: Text('${plantCost} P'),
-                  ),
-                  error: (_, __) => ListTile(
-                    leading: Text(crop.icon, style: const TextStyle(fontSize: 28)),
-                    title: Text(crop.displayName),
-                    subtitle: Text('${plantCost} P'),
-                    enabled: false,
-                  ),
                 );
               }),
             ],
@@ -1354,13 +1383,15 @@ class _GardenScreenState extends ConsumerState<GardenScreen> with SingleTickerPr
             ),
             const SizedBox(height: 16),
             
-            profileAsync.when(
-              data: (profile) {
-                final totalPoints = profile['totalPoints'] ?? 0;
-                final canAfford = totalPoints >= cost;
-                
-                return Column(
-                  children: [
+            Consumer(
+              builder: (context, ref, child) {
+                final pointsAsync = ref.watch(pointsProvider);
+                return pointsAsync.when(
+                  data: (totalPoints) {
+                    final canAfford = totalPoints >= cost;
+                    
+                    return Column(
+                      children: [
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
@@ -1420,11 +1451,13 @@ class _GardenScreenState extends ConsumerState<GardenScreen> with SingleTickerPr
                         ],
                       ),
                     ),
-                  ],
+                      ],
+                    );
+                  },
+                  loading: () => const CircularProgressIndicator(),
+                  error: (_, __) => const Text('Cannot load points'),
                 );
               },
-              loading: () => const CircularProgressIndicator(),
-              error: (_, __) => const Text('Cannot load points'),
             ),
           ],
         ),
@@ -1433,31 +1466,35 @@ class _GardenScreenState extends ConsumerState<GardenScreen> with SingleTickerPr
             onPressed: () => Navigator.of(context).pop(),
             child: const Text('Cancel'),
           ),
-          profileAsync.when(
-            data: (profile) {
-              final totalPoints = profile['totalPoints'] ?? 0;
-              final canAfford = totalPoints >= cost;
-              
-              return ElevatedButton(
-                onPressed: canAfford ? () {
-                  Navigator.of(context).pop();
-                  _progressCrop(context, ref, tile);
-                } : null,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: canAfford ? Colors.blue : Colors.grey,
-                  foregroundColor: Colors.white,
+          Consumer(
+            builder: (context, ref, child) {
+              final pointsAsync = ref.watch(pointsProvider);
+              return pointsAsync.when(
+                data: (totalPoints) {
+                  final canAfford = totalPoints >= cost;
+                  
+                  return ElevatedButton(
+                    onPressed: canAfford ? () {
+                      Navigator.of(context).pop();
+                      _progressCrop(context, ref, tile);
+                    } : null,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: canAfford ? Colors.blue : Colors.grey,
+                      foregroundColor: Colors.white,
+                    ),
+                    child: Text(canAfford ? 'Grow' : 'Not enough points'),
+                  );
+                },
+                loading: () => const ElevatedButton(
+                  onPressed: null,
+                  child: Text('Loading...'),
                 ),
-                child: Text(canAfford ? 'Grow' : 'Not enough points'),
+                error: (_, __) => const ElevatedButton(
+                  onPressed: null,
+                  child: Text('Error'),
+                ),
               );
             },
-            loading: () => const ElevatedButton(
-              onPressed: null,
-              child: Text('Loading...'),
-            ),
-            error: (_, __) => const ElevatedButton(
-              onPressed: null,
-              child: Text('오류'),
-            ),
           ),
         ],
       ),

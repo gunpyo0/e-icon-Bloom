@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:bloom/data/services/eco_backend.dart';
+import 'package:bloom/providers/points_provider.dart';
 
 final profileProvider = FutureProvider<Map<String, dynamic>>((ref) async {
   return await EcoBackend.instance.myProfile();
@@ -18,6 +19,7 @@ class ProfileScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final profileAsync = ref.watch(profileProvider);
     final leagueAsync = ref.watch(leagueProvider);
+    final pointsAsync = ref.watch(pointsProvider);
 
     return Scaffold(
       backgroundColor: Colors.grey[50],
@@ -46,6 +48,7 @@ class ProfileScreen extends ConsumerWidget {
         onRefresh: () async {
           ref.invalidate(profileProvider);
           ref.invalidate(leagueProvider);
+          await ref.read(pointsProvider.notifier).refresh();
         },
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
@@ -183,7 +186,17 @@ class ProfileScreen extends ConsumerWidget {
             profileAsync.when(
               data: (profile) => Column(
                 children: [
-                  _buildStatRow('Total Points', '${profile['totalPoints'] ?? 0} P'),
+                  // Real-time points display
+                  Consumer(
+                    builder: (context, ref, child) {
+                      final pointsAsync = ref.watch(pointsProvider);
+                      return pointsAsync.when(
+                        data: (totalPoints) => _buildStatRow('Total Points', '$totalPoints P'),
+                        loading: () => _buildStatRow('Total Points', 'Loading...'),
+                        error: (_, __) => _buildStatRow('Total Points', '${profile['totalPoints'] ?? 0} P'),
+                      );
+                    },
+                  ),
                   const SizedBox(height: 12),
                   _buildStatRow('Education Points', '${profile['eduPoints'] ?? 0} P'),
                   const SizedBox(height: 12),

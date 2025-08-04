@@ -1,5 +1,5 @@
 // lib/services/eco_backend.dart
-//  Flutter 3.16.x  /  Firebase SDK  11월 2025 기준
+//  Flutter 3.16.x  /  Firebase SDK  November 2025
 
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -8,9 +8,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:bloom/providers/points_provider.dart';
 
-/// ⚡  EcoBackend  –  앱 전역에서 쓰이는 Firebase/CloudFunctions 래퍼
-///    EcoBackend.instance 로 싱글턴 접근
+/// ⚡  EcoBackend  –  Firebase/CloudFunctions wrapper used across the app
+///    Access via EcoBackend.instance singleton
 class EcoBackend {
   /*───────────────────────── singleton ─────────────────────────*/
   EcoBackend._internal();
@@ -506,6 +507,9 @@ class EcoBackend {
       
       print('Transaction completed successfully');
       print('=== PLANT CROP LOCAL SUCCESS ===');
+      
+      // 포인트 변경 알림
+      notifyPointsChanged();
     } catch (e, stackTrace) {
       print('=== PLANT CROP LOCAL ERROR ===');
       print('Error: $e');
@@ -535,6 +539,9 @@ class EcoBackend {
       await _progressCropLocal(user.uid, x, y, cost);
       
       print('Crop progressed locally at ($x, $y) with cost $cost');
+      
+      // 포인트 변경 알림
+      notifyPointsChanged();
     } catch (e) {
       print('Error progressing crop locally: $e');
       // 로컬 처리 실패 시 원래 방식 시도
@@ -619,6 +626,10 @@ class EcoBackend {
       await _harvestCropLocal(user.uid, x, y, reward);
       
       print('Crop harvested locally at ($x, $y) with reward $reward');
+      
+      // 포인트 변경 알림
+      notifyPointsChanged();
+      
       return reward; // 획득한 포인트 반환
     } catch (e) {
       print('Error harvesting crop locally: $e');
@@ -684,6 +695,9 @@ class EcoBackend {
       await _addPointsLocal(user.uid, amount);
       
       print('Points added successfully: $amount points to user ${user.uid}');
+      
+      // 포인트 변경 알림
+      notifyPointsChanged();
     } catch (e) {
       print('Error adding points locally: $e');
       // 로컬 업데이트 실패 시 Cloud Function 시도
@@ -1166,6 +1180,9 @@ class EcoBackend {
       await _fundWithPointsLocal(user.uid, projectId, points);
       
       print('Funding completed successfully: $points points to project $projectId');
+      
+      // 포인트 변경 알림
+      notifyPointsChanged();
     } catch (e) {
       print('Error funding with points: $e');
       throw Exception('펀딩 처리 중 오류가 발생했습니다: $e');
@@ -1417,6 +1434,8 @@ class EcoBackend {
       // 포인트 지급 (정답인 경우)
       if (isCorrect && pointsEarned > 0) {
         await _addPointsToUser(user.uid, pointsEarned);
+        // 포인트 변경 알림
+        notifyPointsChanged();
       }
 
       return {
@@ -1514,63 +1533,62 @@ class EcoBackend {
 
   /// 레슨별 퀴즈 더미 데이터 생성
   List<Map<String, dynamic>> _getQuizzesByLessonId(int lessonId) {
-    // 레슨별 퀴즈 데이터
     final quizData = {
-      1: [ // 기후 변화의 이해
+      1: [
         {
           'id': 1,
-          'question': '지구온난화의 주요 원인은 무엇인가요?',
+          'question': 'What is the main cause of global warming?',
           'options': [
-            {'text': '태양의 활동 증가', 'isCorrect': false},
-            {'text': '온실가스 배출 증가', 'isCorrect': true},
-            {'text': '화산 폭발', 'isCorrect': false},
-            {'text': '바다의 염분 농도 변화', 'isCorrect': false},
+            {'text': 'Increased solar activity', 'isCorrect': false},
+            {'text': 'Increased greenhouse gas emissions', 'isCorrect': true},
+            {'text': 'Volcanic eruptions', 'isCorrect': false},
+            {'text': 'Changes in ocean salinity', 'isCorrect': false},
           ],
           'correctAnswerIndex': 1,
-          'explanation': '온실가스(CO2, 메탄 등)의 배출 증가가 지구온난화의 주요 원인입니다.',
+          'explanation': 'Increased emissions of greenhouse gases (CO2, methane, etc.) are the main cause of global warming.',
           'points': 10,
         },
         {
           'id': 2,
-          'question': '가장 강력한 온실가스는 무엇인가요?',
+          'question': 'What is the most potent greenhouse gas?',
           'options': [
-            {'text': '이산화탄소(CO2)', 'isCorrect': false},
-            {'text': '메탄(CH4)', 'isCorrect': false},
-            {'text': '아산화질소(N2O)', 'isCorrect': false},
-            {'text': '불화가스류', 'isCorrect': true},
+            {'text': 'Carbon dioxide (CO2)', 'isCorrect': false},
+            {'text': 'Methane (CH4)', 'isCorrect': false},
+            {'text': 'Nitrous oxide (N2O)', 'isCorrect': false},
+            {'text': 'Fluorinated gases', 'isCorrect': true},
           ],
           'correctAnswerIndex': 3,
-          'explanation': '불화가스류는 CO2보다 수천 배 강력한 온실효과를 가집니다.',
+          'explanation': 'Fluorinated gases have thousands of times more potent greenhouse effect than CO2.',
           'points': 15,
         },
       ],
-      2: [ // 재생에너지 기초
+      2: [
         {
           'id': 3,
-          'question': '재생에너지가 아닌 것은?',
+          'question': 'Which of the following is NOT renewable energy?',
           'options': [
-            {'text': '태양광 에너지', 'isCorrect': false},
-            {'text': '풍력 에너지', 'isCorrect': false},
-            {'text': '천연가스', 'isCorrect': true},
-            {'text': '수력 에너지', 'isCorrect': false},
+            {'text': 'Solar energy', 'isCorrect': false},
+            {'text': 'Wind energy', 'isCorrect': false},
+            {'text': 'Natural gas', 'isCorrect': true},
+            {'text': 'Hydroelectric energy', 'isCorrect': false},
           ],
           'correctAnswerIndex': 2,
-          'explanation': '천연가스는 화석연료로 재생에너지가 아닙니다.',
+          'explanation': 'Natural gas is a fossil fuel and not a renewable energy source.',
           'points': 10,
         },
       ],
-      3: [ // 물 절약 방법
+      3: [
         {
           'id': 4,
-          'question': '가정에서 물을 가장 많이 사용하는 곳은?',
+          'question': 'Where is water used most in households?',
           'options': [
-            {'text': '화장실', 'isCorrect': true},
-            {'text': '주방', 'isCorrect': false},
-            {'text': '세탁실', 'isCorrect': false},
-            {'text': '정원', 'isCorrect': false},
+            {'text': 'Bathroom', 'isCorrect': true},
+            {'text': 'Kitchen', 'isCorrect': false},
+            {'text': 'Laundry room', 'isCorrect': false},
+            {'text': 'Garden', 'isCorrect': false},
           ],
           'correctAnswerIndex': 0,
-          'explanation': '가정에서 물 사용량의 약 30%가 화장실에서 사용됩니다.',
+          'explanation': 'About 30% of household water usage occurs in the bathroom.',
           'points': 10,
         },
       ],
