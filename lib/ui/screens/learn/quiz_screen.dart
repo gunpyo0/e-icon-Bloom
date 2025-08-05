@@ -1,11 +1,12 @@
+import 'package:bloom/data/models/quiz.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:bloom/data/services/eco_backend.dart';
-import 'package:bloom/data/models/quiz.dart';
+import 'package:bloom/data/models/lesson_models.dart';
 import 'package:bloom/providers/points_provider.dart';
 
 class QuizScreen extends ConsumerStatefulWidget {
-  final int lessonId;
+  final String lessonId;
   final String lessonTitle;
 
   const QuizScreen({
@@ -36,9 +37,8 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
 
   Future<void> _loadQuizzes() async {
     try {
-      // Check lesson completion status
-      final completed = await EcoBackend.instance.isLessonCompleted(widget.lessonId);
-      
+      final completed = await EcoBackend.instance
+          .isLessonCompleted(widget.lessonId);
       if (completed) {
         setState(() {
           isLessonCompleted = true;
@@ -47,17 +47,15 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
         return;
       }
 
-      // Load quiz data
-      final quizData = await EcoBackend.instance.getLessonQuizzes(widget.lessonId);
-      
+      final quizList = await EcoBackend.instance
+          .getLessonQuizzesFromServer(widget.lessonId.toString());
+
       setState(() {
-        quizzes = quizData.map((data) => Quiz.fromJson(data)).toList();
+        quizzes = quizList;
         isLoading = false;
       });
     } catch (e) {
-      setState(() {
-        isLoading = false;
-      });
+      setState(() => isLoading = false);
       _showErrorDialog('Failed to load quiz: $e');
     }
   }
@@ -73,7 +71,7 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
       final result = await EcoBackend.instance.submitQuizAnswer(
         lessonId: widget.lessonId,
         quizId: quizzes[currentQuizIndex].id,
-        selectedAnswer: selectedAnswer!,
+        answerIndex: selectedAnswer!,
       );
 
       // Save result

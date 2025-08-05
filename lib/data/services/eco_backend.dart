@@ -3,6 +3,8 @@
 
 import 'dart:io';
 import 'package:bloom/data/models/fund.dart';
+import 'package:bloom/data/models/lesson_models.dart';
+import 'package:bloom/data/models/quiz.dart';
 import 'package:bloom/firebase_options.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
@@ -1187,239 +1189,52 @@ class EcoBackend {
 
 
   /*──────────────────── 교육 및 퀴즈 관련 기능 ────────────────────*/
-
-  /// 교육 완료 상태 확인
-  Future<bool> isLessonCompleted(int lessonId) async {
-    try {
-      final user = _auth.currentUser;
-      if (user == null) return false;
-
-      final doc = await _fs
-          .collection('users')
-          .doc(user.uid)
-          .collection('lessonCompletions')
-          .doc(lessonId.toString())
-          .get();
-
-      return doc.exists && (doc.data()?['isCompleted'] ?? false);
-    } catch (e) {
-      print('Error checking lesson completion: $e');
-      return false;
-    }
+  /// 레슨 전체 목록 (메타) 가져오기
+  Future<List<LessonMeta>> listLessons() async {
+    final snap = await _fs.collection('lessons').get();
+    return snap.docs
+        .map((d) => LessonMeta.fromDoc(d.id, d.data()))
+        .toList();
   }
 
-  /// 교육의 퀴즈 목록 가져오기
-  Future<List<Map<String, dynamic>>> getLessonQuizzes(int lessonId) async {
-    try {
-      // 실제로는 Firestore에서 가져와야 하지만, 여기서는 더미 데이터 사용
-      await Future.delayed(const Duration(milliseconds: 500));
+  /// 특정 레슨의 스텝 목록
+  Future<List<LessonStep>> getLessonSteps(String lessonId) async {
+    final qs = await _fs
+        .collection('lessons')
+        .doc(lessonId)
+        .collection('steps')
+        .orderBy(FieldPath.documentId)
+        .get();
 
-      return _getQuizzesByLessonId(lessonId);
-    } catch (e) {
-      print('Error getting lesson quizzes: $e');
-      throw Exception('퀴즈를 불러올 수 없습니다: $e');
-    }
+    return qs.docs
+        .map((d) => LessonStep.fromDoc(d.data()))
+        .toList();
   }
 
-  /// 퀴즈 답안 제출 및 채점
-  Future<Map<String, dynamic>> submitQuizAnswer({
-    required int lessonId,
-    required int quizId,
-    required int selectedAnswer,
-  }) async {
-    try {
-      final user = _auth.currentUser;
-      if (user == null) throw Exception('로그인이 필요합니다');
+  /// 특정 레슨의 퀴즈 목록
+  /// 레슨별 퀴즈 (Firestore ‘quiz’ 서브컬렉션)
+  Future<List<Quiz>> getLessonQuizzesFromServer(String lessonId) async {
+    final qs = await _fs
+        .collection('lessons')
+        .doc(lessonId)
+        .collection('quiz')
+        .orderBy(FieldPath.documentId)
+        .get();
 
-      // 이미 완료한 교육인지 확인
-      final isCompleted = await isLessonCompleted(lessonId);
-      if (isCompleted) {
-        return {
-          'isCorrect': false,
-          'pointsEarned': 0,
-          'explanation': '이미 완료한 교육입니다.',
-          'alreadyCompleted': true,
-        };
-      }
-
-      // 퀴즈 정답 확인
-      final quizzes = await getLessonQuizzes(lessonId);
-      final quiz = quizzes.firstWhere(
-            (q) => q['id'] == quizId,
-        orElse: () => throw Exception('퀴즈를 찾을 수 없습니다'),
+    return qs.docs.map((d) {
+      final j = d.data();
+      final correct = j['correct'] ?? 0;
+      return Quiz(
+        id       : d.id,
+        question : j['question'] ?? '',
+        options  : List<String>.from(j['options'] ?? []).asMap().entries
+            .map((e) => QuizOption(text: e.value, isCorrect: e.key == correct))
+            .toList(),
+        correctAnswerIndex: correct,
+        explanation: j['explanation'] ?? '',
+        points     : j['points'] ?? 10,
       );
-
-      final correctAnswer = quiz['correctAnswerIndex'] as int;
-      final isCorrect = selectedAnswer == correctAnswer;
-      final pointsEarned = isCorrect ? (quiz['points'] as int? ?? 10) : 0;
-
-      // 퀴즈 결과 저장
-      await _saveQuizResult(user.uid, lessonId, quizId, selectedAnswer, isCorrect, pointsEarned);
-
-      // 포인트 지급 (정답인 경우)
-      if (isCorrect && pointsEarned > 0) {
-        await _addPointsToUser(user.uid, pointsEarned);
-        // 포인트 변경 알림
-        notifyPointsChanged();
-      }
-
-      return {
-        'isCorrect': isCorrect,
-        'pointsEarned': pointsEarned,
-        'explanation': quiz['explanation'] ?? '',
-        'correctAnswer': correctAnswer,
-        'alreadyCompleted': false,
-      };
-    } catch (e) {
-      print('Error submitting quiz answer: $e');
-      throw Exception('퀴즈 답안 제출에 실패했습니다: $e');
-    }
-  }
-
-  /// 교육 완료 처리
-  Future<void> completeLessonWithQuizzes({
-    required int lessonId,
-    required List<Map<String, dynamic>> quizResults,
-  }) async {
-    try {
-      final user = _auth.currentUser;
-      if (user == null) throw Exception('로그인이 필요합니다');
-
-      // 이미 완료한 교육인지 확인
-      final isAlreadyCompleted = await isLessonCompleted(lessonId);
-      if (isAlreadyCompleted) {
-        print('Lesson $lessonId already completed');
-        return;
-      }
-
-      final totalPoints = quizResults
-          .where((result) => result['isCorrect'] == true)
-          .fold<int>(0, (sum, result) => sum + (result['pointsEarned'] as int? ?? 0));
-
-      // 교육 완료 상태 저장
-      await _fs
-          .collection('users')
-          .doc(user.uid)
-          .collection('lessonCompletions')
-          .doc(lessonId.toString())
-          .set({
-        'lessonId': lessonId,
-        'isCompleted': true,
-        'totalPoints': totalPoints,
-        'quizResults': quizResults,
-        'completedAt': FieldValue.serverTimestamp(),
-      });
-
-      print('Lesson $lessonId completed with $totalPoints points');
-    } catch (e) {
-      print('Error completing lesson: $e');
-      throw Exception('교육 완료 처리에 실패했습니다: $e');
-    }
-  }
-
-  /// 퀴즈 결과 저장 (내부 메서드)
-  Future<void> _saveQuizResult(
-      String uid,
-      int lessonId,
-      int quizId,
-      int selectedAnswer,
-      bool isCorrect,
-      int pointsEarned,
-      ) async {
-    await _fs
-        .collection('users')
-        .doc(uid)
-        .collection('quizResults')
-        .add({
-      'lessonId': lessonId,
-      'quizId': quizId,
-      'selectedAnswerIndex': selectedAnswer,
-      'isCorrect': isCorrect,
-      'pointsEarned': pointsEarned,
-      'completedAt': FieldValue.serverTimestamp(),
-    });
-  }
-
-  /// 사용자에게 포인트 추가 (내부 메서드)
-  Future<void> _addPointsToUser(String uid, int points) async {
-    await _fs.runTransaction((transaction) async {
-      final userDocRef = _fs.collection('users').doc(uid);
-      final userDoc = await transaction.get(userDocRef);
-
-      if (userDoc.exists) {
-        final currentPoints = userDoc.data()?['totalPoints'] ?? 0;
-        transaction.update(userDocRef, {
-          'totalPoints': currentPoints + points,
-          'updatedAt': FieldValue.serverTimestamp(),
-        });
-      }
-    });
-  }
-
-  /// 레슨별 퀴즈 더미 데이터 생성
-  List<Map<String, dynamic>> _getQuizzesByLessonId(int lessonId) {
-    final quizData = {
-      1: [
-        {
-          'id': 1,
-          'question': 'What is the main cause of global warming?',
-          'options': [
-            {'text': 'Increased solar activity', 'isCorrect': false},
-            {'text': 'Increased greenhouse gas emissions', 'isCorrect': true},
-            {'text': 'Volcanic eruptions', 'isCorrect': false},
-            {'text': 'Changes in ocean salinity', 'isCorrect': false},
-          ],
-          'correctAnswerIndex': 1,
-          'explanation': 'Increased emissions of greenhouse gases (CO2, methane, etc.) are the main cause of global warming.',
-          'points': 10,
-        },
-        {
-          'id': 2,
-          'question': 'What is the most potent greenhouse gas?',
-          'options': [
-            {'text': 'Carbon dioxide (CO2)', 'isCorrect': false},
-            {'text': 'Methane (CH4)', 'isCorrect': false},
-            {'text': 'Nitrous oxide (N2O)', 'isCorrect': false},
-            {'text': 'Fluorinated gases', 'isCorrect': true},
-          ],
-          'correctAnswerIndex': 3,
-          'explanation': 'Fluorinated gases have thousands of times more potent greenhouse effect than CO2.',
-          'points': 15,
-        },
-      ],
-      2: [
-        {
-          'id': 3,
-          'question': 'Which of the following is NOT renewable energy?',
-          'options': [
-            {'text': 'Solar energy', 'isCorrect': false},
-            {'text': 'Wind energy', 'isCorrect': false},
-            {'text': 'Natural gas', 'isCorrect': true},
-            {'text': 'Hydroelectric energy', 'isCorrect': false},
-          ],
-          'correctAnswerIndex': 2,
-          'explanation': 'Natural gas is a fossil fuel and not a renewable energy source.',
-          'points': 10,
-        },
-      ],
-      3: [
-        {
-          'id': 4,
-          'question': 'Where is water used most in households?',
-          'options': [
-            {'text': 'Bathroom', 'isCorrect': true},
-            {'text': 'Kitchen', 'isCorrect': false},
-            {'text': 'Laundry room', 'isCorrect': false},
-            {'text': 'Garden', 'isCorrect': false},
-          ],
-          'correctAnswerIndex': 0,
-          'explanation': 'About 30% of household water usage occurs in the bathroom.',
-          'points': 10,
-        },
-      ],
-    };
-
-    return quizData[lessonId] ?? [];
+    }).toList();
   }
 
   FirebaseFunctions get functions => _func;
@@ -1472,4 +1287,115 @@ class EcoBackend {
         .httpsCallable('donateToCampaign')
         .call({'campaignId': campaignId, 'amount': amount});
   }
+  /*══════════════  Lessons & Quiz helpers  ══════════════*/
+
+  /// ① 레슨 완료 여부 확인
+  ///    ‣ users/{uid}/progress/{lessonId} 문서에
+  ///      { isLessonDone:true , quizDone:true } 둘 다 만족하면 true
+  Future<bool> isLessonCompleted(String lessonId) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return false;
+
+    final snap = await _fs
+        .doc('users/$uid/progress/$lessonId')
+        .get(const GetOptions(source: Source.server)); // 항상 최신
+
+    if (!snap.exists) return false;
+    final d = snap.data()!;
+    return (d['isLessonDone'] ?? false) && (d['quizDone'] ?? false);
+  }
+
+  /// ② 퀴즈 한 문제 채점 & 포인트 지급
+  ///    Cloud Function **answerQuiz** 호출 → Firestore-based 트랜잭션
+  ///
+  /// 반환 구조
+  /// ```json
+  /// {
+  ///   "isCorrect"       : true,
+  ///   "awarded"         : 10,
+  ///   "alreadyAnswered" : false
+  /// }
+  /// ```
+  Future<Map<String, dynamic>> submitQuizAnswer({
+    required String lessonId,
+    required String quizId,
+    required int answerIndex,
+  }) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) throw Exception('로그인이 필요합니다');
+
+    final res = await _func
+        .httpsCallable('answerQuiz')
+        .call({
+      'lessonId' : lessonId,
+      'quizId'   : quizId,
+      'answerIdx': answerIndex,
+    });
+
+    final data = Map<String, dynamic>.from(res.data);
+
+    // 포인트 프로바이더 등과 연동하고 싶으면 여기서 처리
+    if (data['awarded'] is int && data['awarded'] > 0) {
+      notifyPointsChanged();
+    }
+
+    return data;
+  }
+
+  /// ③ 레슨의 모든 퀴즈를 제출한 뒤 호출(선택 사항)
+  ///    – 점수 합산·progress 업데이트를 **클라이언트에서** 보장하고 싶을 때 사용
+  ///
+  /// `quizResults` 형식:
+  /// ```dart
+  /// [
+  ///   {'quizId':'1','isCorrect':true ,'pointsEarned':10},
+  ///   {'quizId':'2','isCorrect':false,'pointsEarned':0},
+  /// ]
+  /// ```
+  Future<void> completeLessonWithQuizzes({
+    required String lessonId,
+    required List<Map<String, dynamic>> quizResults,
+  }) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) throw Exception('로그인이 필요합니다');
+
+    // 이미 완료됐는지 한번 더 확인
+    if (await isLessonCompleted(lessonId)) return;
+
+    final totalEarned = quizResults.fold<int>(
+        0, (s, r) => s + (r['pointsEarned'] as int? ?? 0));
+
+    final userRef = _fs.doc('users/$uid');
+    final progRef = userRef.collection('progress').doc(lessonId);
+
+    await _fs.runTransaction((tx) async {
+      tx.set(progRef, {
+        'quizDone'    : true,
+        'updatedAt'   : FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      if (totalEarned > 0) {
+        tx.update(userRef, {
+          'point'     : FieldValue.increment(totalEarned),
+          'updatedAt' : FieldValue.serverTimestamp(),
+        });
+      }
+    });
+
+    if (totalEarned > 0) notifyPointsChanged();
+  }
+
+  Future<List<LessonStep>> fetchLessonSteps(String lessonId) async {
+    final qs = await _fs
+        .collection('lessons')
+        .doc(lessonId)
+        .collection('steps')
+        .orderBy(FieldPath.documentId)        // 0,1,2…
+        .get();
+
+    return qs.docs
+        .map((d) => LessonStep.fromDoc(d.data()))
+        .toList();
+  }
+
 }
