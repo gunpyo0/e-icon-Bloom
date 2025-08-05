@@ -1,43 +1,87 @@
 // lib/ui/screens/fund/fund_screen.dart
+import 'package:bloom/data/services/eco_backend.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'fund_viewmodel.dart';
 import 'package:bloom/providers/points_provider.dart';
-
-class FundScreen extends ConsumerWidget {
+class FundScreen extends ConsumerStatefulWidget {
   const FundScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<FundScreen> createState() => _FundScreenState();
+}
+
+
+class _FundScreenState extends ConsumerState<FundScreen>
+    with WidgetsBindingObserver {
+
+  /*── 🔑 전용 UID ──*/
+  bool get _isOwner =>
+      EcoBackend.instance.currentUser?.uid == 'ClOYnvB9npXjR95TKA4Ik88BS1q2';
+
+  /*── 생명주기 등록 ─*/
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+
+    // 첫 빌드 직후에 바로 refresh
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      ref.read(fundViewModelProvider.notifier).refresh();
+    });
+  }
+
+  /*── 앱이 다시 포커스될 때(refresh) ─*/
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      ref.read(fundViewModelProvider.notifier).refresh();
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  /*──────────────── UI ─────────────────*/
+  @override
+  Widget build(BuildContext context) {
     final selectedFilter = ref.watch(selectedFilterProvider);
-    
-    return Column(
-      children: [
-        // Points information header
-        _buildPointsHeader(context, ref),
-        
-        // Filter buttons
-        _buildFilterButtons(context, ref),
-        
-        // Funding list
-        Expanded(
-          child: RefreshIndicator(
-            onRefresh: () async {
-              ref.read(pointsProvider.notifier).refresh();
-              ref.invalidate(fundViewModelProvider);
-              await ref.read(fundViewModelProvider.notifier).refresh();
-            },
+
+    return Scaffold(
+      body: Column(
+        children: [
+          _buildFilterButtons(context, ref),
+          Expanded(
             child: selectedFilter == FilterType.sort
-                ? _buildSortedFundingList(context, ref.watch(sortedFundingProjectsProvider))
+                ? _buildSortedFundingList(
+                context, ref.watch(sortedFundingProjectsProvider))
                 : selectedFilter == FilterType.search
-                    ? _buildSearchResults(context, ref, ref.watch(filteredFundingProjectsProvider))
-                    : _buildFilteredFundingList(context, ref.watch(filteredFundingProjectsProvider)),
+                ? _buildSearchResults(
+              context,
+              ref,
+              ref.watch(filteredFundingProjectsProvider),
+            )
+                : _buildFilteredFundingList(
+                context, ref.watch(filteredFundingProjectsProvider)),
           ),
-        ),
-      ],
+        ],
+      ),
+
+      /*── FAB(권한 UID만 활성) ─*/
+      floatingActionButton: FloatingActionButton(
+        backgroundColor:
+        _isOwner ? Colors.green : Colors.grey.shade400.withOpacity(.6),
+        onPressed: _isOwner ? () => context.push('/fund/create') : null,
+        child: const Icon(Icons.add),
+      ),
     );
   }
+
 
   Widget _buildPointsHeader(BuildContext context, WidgetRef ref) {
     final pointsAsync = ref.watch(pointsProvider);

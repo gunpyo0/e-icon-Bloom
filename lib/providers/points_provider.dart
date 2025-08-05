@@ -32,7 +32,7 @@ class PointsNotifier extends StateNotifier<AsyncValue<int>> {
       state = const AsyncValue.loading();
       // myProfile()에서 totalPoints를 가져와서 일관성 보장
       final profile = await EcoBackend.instance.myProfile();
-      final points = profile['totalPoints'] ?? 0;
+      final points = profile['point'] ?? 0;
       state = AsyncValue.data(points);
       print('Points loaded from profile: $points');
     } catch (error, stackTrace) {

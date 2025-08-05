@@ -2,10 +2,13 @@
 //  Flutter 3.16.x  /  Firebase SDK  November 2025
 
 import 'dart:io';
+import 'package:bloom/data/models/fund.dart';
+import 'package:bloom/firebase_options.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:bloom/providers/points_provider.dart';
@@ -33,34 +36,52 @@ class EcoBackend {
 
   /// ▸ Google 로그인 (웹/모바일 자동 처리)
   Future<UserCredential> signInWithGoogle() async {
-  final auth = FirebaseAuth.instance;
+    final auth = FirebaseAuth.instance;
 
-  if (kIsWeb) {
-    // ───────── WEB ─────────
-    final provider = GoogleAuthProvider();
-    provider.setCustomParameters({'prompt': 'select_account'});
-    return await auth.signInWithPopup(provider);
-  } else {
-    // ───────── Android / iOS ─────────
-    final googleUser = await GoogleSignIn().signIn();
-    if (googleUser == null) throw Exception('로그인 취소됨');
+    // ─── 1) Web ───
+    if (kIsWeb) {
+      final provider = GoogleAuthProvider()
+        ..addScope('email')
+        ..setCustomParameters({'prompt': 'select_account'});
+      return await auth.signInWithPopup(provider);
+    }
 
-    final googleAuth = await googleUser.authentication;
-    final credential = GoogleAuthProvider.credential(
-      accessToken: googleAuth.accessToken,
-      idToken: googleAuth.idToken,
+    // ─── 2) Android / iOS ───
+    final googleSignIn = GoogleSignIn(
+      // ① **웹 클라이언트 ID** 넣어 주면 서버 검증까지 완벽!
+      //    FirebaseOptions 안에 이미 있으면 꺼내 쓰기 👇
+      clientId: DefaultFirebaseOptions.currentPlatform.iosClientId,
+      scopes: ['email'],
     );
-    return await auth.signInWithCredential(credential);
+
+    try {
+      final googleUser = await googleSignIn.signIn();
+      if (googleUser == null) {
+        throw FirebaseAuthException(code: 'canceled', message: '사용자 취소');
+      }
+
+      final googleAuth = await googleUser.authentication;
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      return await auth.signInWithCredential(credential);
+    } on FirebaseAuthException catch (e) {
+      // ApiException:10 → 보통 SHA 미매칭 or clientId 불일치
+      debugPrint('GoogleSignIn error: ${e.code} / ${e.message}');
+      rethrow;
+    }
   }
-}
+
 
   /// ▸ 이메일/패스워드 로그인
   Future<UserCredential> signIn(String email, String pw)
-      => _auth.signInWithEmailAndPassword(email: email, password: pw);
+  => _auth.signInWithEmailAndPassword(email: email, password: pw);
 
   /// ▸ 회원가입
   Future<UserCredential> signUp(String email, String pw)
-      => _auth.createUserWithEmailAndPassword(email: email, password: pw);
+  => _auth.createUserWithEmailAndPassword(email: email, password: pw);
 
   /// ▸ 로그아웃
   Future<void> signOut() async {
@@ -76,7 +97,7 @@ class EcoBackend {
       final user = _auth.currentUser;
       if (user != null) {
         final userDoc = await _fs.collection('users').doc(user.uid).get();
-        
+
         if (userDoc.exists) {
           final userData = userDoc.data()!;
           print('Profile loaded from Firestore: ${userData['totalPoints']} points');
@@ -94,13 +115,13 @@ class EcoBackend {
           };
         }
       }
-      
+
       // Firestore에 데이터가 없으면 Cloud Function 시도
       print('No local user data, trying Cloud Function...');
       return (await _func.httpsCallable('getMyProfile').call()).data;
     } catch (e) {
       print('Error getting profile: $e');
-      
+
       // 모든 것이 실패하면 기본 데이터 반환
       final user = _auth.currentUser;
       if (user != null) {
@@ -116,7 +137,7 @@ class EcoBackend {
           'completedLessonIds': [],
         };
       }
-      
+
       throw Exception('사용자 프로필을 불러올 수 없습니다');
     }
   }
@@ -142,11 +163,11 @@ class EcoBackend {
 
     // Find leagues where user is a member
     final leaguesSnapshot = await _fs.collection('leagues').get();
-    
+
     for (final leagueDoc in leaguesSnapshot.docs) {
       final leagueId = leagueDoc.id;
       final leagueData = leagueDoc.data();
-      
+
       // Check if user is member of this league
       final memberDoc = await _fs
           .collection('leagues')
@@ -154,7 +175,7 @@ class EcoBackend {
           .collection('members')
           .doc(uid)
           .get();
-      
+
       if (memberDoc.exists) {
         // Get all members ordered by points (descending)
         final membersSnapshot = await _fs
@@ -163,16 +184,16 @@ class EcoBackend {
             .collection('members')
             .orderBy('point', descending: true)
             .get();
-        
+
         // Calculate actual rank and member count
         int rank = 1;
         int actualMemberCount = 0;
-        
+
         for (int i = 0; i < membersSnapshot.docs.length; i++) {
           final doc = membersSnapshot.docs[i];
           final memberData = doc.data();
           // Only count valid members (with displayName)
-          if (memberData['displayName'] != null && 
+          if (memberData['displayName'] != null &&
               memberData['displayName'].toString().trim().isNotEmpty) {
             actualMemberCount++;
             if (doc.id == uid) {
@@ -180,9 +201,9 @@ class EcoBackend {
             }
           }
         }
-        
+
         print('User found in league $leagueId, rank: $rank, members: $actualMemberCount');
-        
+
         return {
           'leagueId': leagueId,
           'league': {
@@ -194,7 +215,7 @@ class EcoBackend {
         };
       }
     }
-    
+
     // User not in any league
     print('User $uid not found in any league');
     return {
@@ -207,7 +228,7 @@ class EcoBackend {
 
   Future<Map<String, dynamic>> anotherProfile(String uid) async =>
       (await _func.httpsCallable('getUserProfile')
-                .call({'targetUid': uid})).data;
+          .call({'targetUid': uid})).data;
 
   /*──────────────────────── Lessons ───────────────────────────*/
   Future<void> completeLessons(List<String> ids) async {
@@ -217,7 +238,7 @@ class EcoBackend {
 
       // 클라이언트에서 직접 처리
       await _completeLessonsLocal(user.uid, ids);
-      
+
       print('Lessons completed successfully: $ids for user ${user.uid}');
     } catch (e) {
       print('Error completing lessons locally: $e');
@@ -234,20 +255,20 @@ class EcoBackend {
 
   Future<void> _completeLessonsLocal(String uid, List<String> lessonIds) async {
     final userDocRef = _fs.collection('users').doc(uid);
-    
+
     await _fs.runTransaction((transaction) async {
       final userDoc = await transaction.get(userDocRef);
-      
+
       if (userDoc.exists) {
         final currentData = userDoc.data()!;
         final completedLessons = List<String>.from(currentData['completedLessonIds'] ?? []);
-        
+
         // 새로운 레슨들만 추가
         final newLessons = lessonIds.where((id) => !completedLessons.contains(id)).toList();
-        
+
         if (newLessons.isNotEmpty) {
           completedLessons.addAll(newLessons);
-          
+
           transaction.update(userDocRef, {
             'completedLessonIds': completedLessons,
             'updatedAt': FieldValue.serverTimestamp(),
@@ -264,19 +285,19 @@ class EcoBackend {
       if (user == null) throw Exception('로그인이 필요합니다');
 
       print('=== myGarden() DEBUG ===');
-      
+
       // 항상 최신 사용자 문서 가져오기 (캐시 방지)
       final userDoc = await _fs.collection('users').doc(user.uid).get();
-      
+
       if (userDoc.exists) {
         final userData = userDoc.data()!;
         final currentPoints = userData['totalPoints'] ?? 0;
         print('Current user points from Firestore: $currentPoints');
-        
+
         // 사용자 문서에서 정원 데이터 추출 및 타입 변환
         final rawGardenData = userData['garden'];
         Map<String, dynamic> gardenData;
-        
+
         if (rawGardenData != null) {
           // Firestore LinkedMap을 Map<String, dynamic>으로 변환
           gardenData = Map<String, dynamic>.from(rawGardenData);
@@ -286,11 +307,11 @@ class EcoBackend {
             'tiles': {},
           };
         }
-        
+
         // tiles 데이터도 안전하게 변환
         final rawTiles = gardenData['tiles'];
         Map<String, dynamic> tiles;
-        
+
         if (rawTiles != null) {
           tiles = Map<String, dynamic>.from(rawTiles);
           // 각 타일 데이터도 변환
@@ -303,10 +324,10 @@ class EcoBackend {
         } else {
           tiles = {};
         }
-        
+
         print('Garden tiles count: ${tiles.length}');
         print('========================');
-        
+
         // 항상 최신 포인트를 반환
         return {
           'size': gardenData['size'] ?? 3,
@@ -385,7 +406,7 @@ class EcoBackend {
 
   Future<Map<String, dynamic>> otherGarden(String uid) async =>
       (await _func.httpsCallable('getUserGarden')
-                .call({'targetUid': uid})).data;
+          .call({'targetUid': uid})).data;
 
   Future<void> plantCrop(int x, int y, String cropId) async {
     try {
@@ -408,7 +429,7 @@ class EcoBackend {
       try {
         final profile = await myProfile();
         print('Profile points: ${profile['totalPoints']}');
-        
+
         final userDoc = await _fs.collection('users').doc(user.uid).get();
         if (userDoc.exists) {
           final userData = userDoc.data()!;
@@ -423,7 +444,7 @@ class EcoBackend {
 
       // 로컬에서 직접 처리 (Firebase Functions 문제 우회)
       await _plantCropLocal(user.uid, x, y, cropId, cost);
-      
+
       print('Crop planted locally at ($x, $y): $cropId with cost $cost');
     } catch (e) {
       print('Error planting crop locally: $e');
@@ -447,54 +468,54 @@ class EcoBackend {
       print('Position: ($x, $y)');
       print('Crop ID: $cropId');
       print('Cost: $cost');
-      
+
       await _fs.runTransaction((transaction) async {
         print('Starting transaction...');
-        
+
         // 사용자 포인트 확인 및 차감 + 정원 데이터 업데이트 (한 문서에서 처리)
         final userDocRef = _fs.collection('users').doc(uid);
         print('Getting user document: users/$uid');
         final userDoc = await transaction.get(userDocRef);
-        
+
         if (!userDoc.exists) {
           print('ERROR: User document does not exist');
           throw Exception('사용자 정보를 찾을 수 없습니다');
         }
-        
+
         final userData = userDoc.data()!;
         final currentPoints = userData['totalPoints'] ?? 0;
         print('Current user points: $currentPoints');
         print('Required cost: $cost');
-        
+
         if (currentPoints < cost) {
           print('ERROR: Insufficient points');
           throw Exception('포인트가 부족합니다. (필요: ${cost}P, 보유: ${currentPoints}P)');
         }
-        
+
         print('Points sufficient, processing garden data...');
-        
+
         // 기존 정원 데이터 가져오기 (user 문서 내부에서)
         Map<String, dynamic> gardenData = Map<String, dynamic>.from(userData['garden'] ?? {
           'size': 3,
           'tiles': {},
         });
-        
+
         print('Garden data retrieved from user document');
-        
+
         // 타일 업데이트
         final tiles = Map<String, dynamic>.from(gardenData['tiles'] ?? {});
         final tileKey = '$x,$y';
         print('Updating tile: $tileKey');
-        
+
         tiles[tileKey] = {
           'stage': 1, // planted
           'cropId': cropId,
           'plantedAt': FieldValue.serverTimestamp(),
         };
-        
+
         gardenData['tiles'] = tiles;
         gardenData['updatedAt'] = FieldValue.serverTimestamp();
-        
+
         print('Updating user document with new points and garden data...');
         // 포인트 차감과 정원 데이트를 한 번에 업데이트
         transaction.update(userDocRef, {
@@ -504,10 +525,10 @@ class EcoBackend {
         });
         print('User document updated successfully');
       });
-      
+
       print('Transaction completed successfully');
       print('=== PLANT CROP LOCAL SUCCESS ===');
-      
+
       // 포인트 변경 알림
       notifyPointsChanged();
     } catch (e, stackTrace) {
@@ -537,9 +558,9 @@ class EcoBackend {
 
       // 로컬에서 직접 처리
       await _progressCropLocal(user.uid, x, y, cost);
-      
+
       print('Crop progressed locally at ($x, $y) with cost $cost');
-      
+
       // 포인트 변경 알림
       notifyPointsChanged();
     } catch (e) {
@@ -561,42 +582,42 @@ class EcoBackend {
       // 사용자 포인트 확인 및 차감 + 정원 데이터 업데이트 (한 문서에서 처리)
       final userDocRef = _fs.collection('users').doc(uid);
       final userDoc = await transaction.get(userDocRef);
-      
+
       if (!userDoc.exists) {
         throw Exception('사용자 정보를 찾을 수 없습니다');
       }
-      
+
       final userData = userDoc.data()!;
       final currentPoints = userData['totalPoints'] ?? 0;
-      
+
       if (currentPoints < cost) {
         throw Exception('포인트가 부족합니다. (필요: ${cost}P, 보유: ${currentPoints}P)');
       }
-      
+
       // 기존 정원 데이터 가져오기 (user 문서 내부에서)
       Map<String, dynamic> gardenData = Map<String, dynamic>.from(userData['garden'] ?? {
         'size': 3,
         'tiles': {},
       });
-      
+
       final tiles = Map<String, dynamic>.from(gardenData['tiles'] ?? {});
       final tileKey = '$x,$y';
-      
+
       if (!tiles.containsKey(tileKey)) {
         throw Exception('해당 위치에 작물이 없습니다');
       }
-      
+
       final tileData = Map<String, dynamic>.from(tiles[tileKey]);
       final currentStage = tileData['stage'] ?? 0;
-      
+
       // 다음 단계로 성장
       tileData['stage'] = currentStage + 1;
       tileData['updatedAt'] = FieldValue.serverTimestamp();
-      
+
       tiles[tileKey] = tileData;
       gardenData['tiles'] = tiles;
       gardenData['updatedAt'] = FieldValue.serverTimestamp();
-      
+
       // 포인트 차감과 정원 데이터를 한 번에 업데이트
       transaction.update(userDocRef, {
         'totalPoints': currentPoints - cost,
@@ -624,12 +645,12 @@ class EcoBackend {
 
       // 로컬에서 직접 처리
       await _harvestCropLocal(user.uid, x, y, reward);
-      
+
       print('Crop harvested locally at ($x, $y) with reward $reward');
-      
+
       // 포인트 변경 알림
       notifyPointsChanged();
-      
+
       return reward; // 획득한 포인트 반환
     } catch (e) {
       print('Error harvesting crop locally: $e');
@@ -651,32 +672,32 @@ class EcoBackend {
       // 사용자 포인트 지급 + 정원 데이터 업데이트 (한 문서에서 처리)
       final userDocRef = _fs.collection('users').doc(uid);
       final userDoc = await transaction.get(userDocRef);
-      
+
       if (!userDoc.exists) {
         throw Exception('사용자 정보를 찾을 수 없습니다');
       }
-      
+
       final userData = userDoc.data()!;
       final currentPoints = userData['totalPoints'] ?? 0;
-      
+
       // 기존 정원 데이터 가져오기 (user 문서 내부에서)
       Map<String, dynamic> gardenData = Map<String, dynamic>.from(userData['garden'] ?? {
         'size': 3,
         'tiles': {},
       });
-      
+
       final tiles = Map<String, dynamic>.from(gardenData['tiles'] ?? {});
       final tileKey = '$x,$y';
-      
+
       // 작물 제거 (빈 타일로 변경)
       tiles[tileKey] = {
         'stage': 0, // empty
         'updatedAt': FieldValue.serverTimestamp(),
       };
-      
+
       gardenData['tiles'] = tiles;
       gardenData['updatedAt'] = FieldValue.serverTimestamp();
-      
+
       // 포인트 지급과 정원 데이터를 한 번에 업데이트
       transaction.update(userDocRef, {
         'totalPoints': currentPoints + reward,
@@ -693,9 +714,9 @@ class EcoBackend {
 
       // 클라이언트에서 직접 Firestore 업데이트
       await _addPointsLocal(user.uid, amount);
-      
+
       print('Points added successfully: $amount points to user ${user.uid}');
-      
+
       // 포인트 변경 알림
       notifyPointsChanged();
     } catch (e) {
@@ -714,11 +735,11 @@ class EcoBackend {
   Future<void> _addPointsLocal(String uid, int amount) async {
     // 사용자 문서 참조
     final userDocRef = _fs.collection('users').doc(uid);
-    
+
     // 트랜잭션으로 안전하게 포인트 업데이트
     await _fs.runTransaction((transaction) async {
       final userDoc = await transaction.get(userDocRef);
-      
+
       if (!userDoc.exists) {
         // 사용자 문서가 없으면 생성
         final userData = {
@@ -740,18 +761,18 @@ class EcoBackend {
         final currentTotal = currentData['totalPoints'] ?? 0;
         final currentEdu = currentData['eduPoints'] ?? 0;
         final currentLessons = currentData['completedLessons'] ?? 0;
-        
+
         final updates = <String, dynamic>{
           'totalPoints': currentTotal + amount,
           'updatedAt': FieldValue.serverTimestamp(),
         };
-        
+
         // 양수일 때만 교육 포인트와 완료 레슨 수 증가
         if (amount > 0) {
           updates['eduPoints'] = currentEdu + amount;
           updates['completedLessons'] = currentLessons + 1;
         }
-        
+
         transaction.update(userDocRef, updates);
       }
     });
@@ -764,7 +785,7 @@ class EcoBackend {
     File? image,
   }) async {
     final res = await _func.httpsCallable('createPost')
-                           .call({'description': description, 'extension': 'jpg'});
+        .call({'description': description, 'extension': 'jpg'});
     final postId      = res.data['postId']     as String;
     final storagePath = res.data['storagePath'] as String;
 
@@ -791,9 +812,9 @@ class EcoBackend {
   /*──────────────── Stream / 실시간 순위표 ────────────────────*/
   Stream<QuerySnapshot<Map<String, dynamic>>> leagueMembers(String leagueId) =>
       _fs.collection('leagues').doc(leagueId).collection('members')
-         .orderBy('point', descending: true).snapshots();
+          .orderBy('point', descending: true).snapshots();
 
-  /*──────────────────── 자동 리그 참여 (최대 7명) ────────────────────*/  
+  /*──────────────────── 자동 리그 참여 (최대 7명) ────────────────────*/
   Future<void> ensureUserInLeague() async {
     final uid = currentUser?.uid;
     print('=== ensureUserInLeague called with uid: $uid ===');
@@ -826,12 +847,12 @@ class EcoBackend {
           .get();
 
       String leagueId;
-      
+
       if (leaguesQuery.docs.isNotEmpty) {
         // 기존 리그에 참여
         leagueId = leaguesQuery.docs.first.id;
         print('Found existing league: $leagueId with ${leaguesQuery.docs.first.data()['memberCount']} members');
-        
+
         try {
           // 리그 멤버수 증가
           await _fs.collection('leagues').doc(leagueId).update({
@@ -847,7 +868,7 @@ class EcoBackend {
         final newLeagueRef = _fs.collection('leagues').doc();
         leagueId = newLeagueRef.id;
         print('Creating new league: $leagueId');
-        
+
         try {
           await newLeagueRef.set({
             'name': 'League ${DateTime.now().millisecondsSinceEpoch}',
@@ -864,7 +885,7 @@ class EcoBackend {
       // 사용자를 리그 멤버로 추가
       final displayName = currentUser?.displayName ?? currentUser?.email?.split('@')[0] ?? 'User';
       print('Adding user to league with displayName: $displayName');
-      
+
       final memberData = {
         'uid': uid,
         'displayName': displayName,
@@ -872,7 +893,7 @@ class EcoBackend {
         'joinedAt': FieldValue.serverTimestamp(),
       };
       print('Member data to add: $memberData');
-      
+
       await _fs.collection('leagues').doc(leagueId).collection('members').doc(uid).set(memberData);
       print('Firestore write completed');
 
@@ -894,10 +915,10 @@ class EcoBackend {
   Future<void> backupLeagueMembers() async {
     try {
       print('=== BACKING UP LEAGUE MEMBERS ===');
-      
+
       // 먼저 기존 사용자들 찾기
       await _findExistingUsers();
-      
+
       // 알려진 사용자들을 다시 추가
       final knownUsers = [
         {
@@ -907,14 +928,14 @@ class EcoBackend {
         },
         {
           'uid': currentUser?.uid, // 현재 사용자
-          'displayName': currentUser?.displayName ?? currentUser?.email?.split('@')[0] ?? 'User',  
+          'displayName': currentUser?.displayName ?? currentUser?.email?.split('@')[0] ?? 'User',
           'point': 0,
         },
       ];
 
       // s1l1 리그에 멤버들 추가
       const leagueId = 's1l1';
-      
+
       for (final user in knownUsers) {
         if (user['uid'] != null && user['uid'].toString().isNotEmpty) {
           try {
@@ -940,7 +961,7 @@ class EcoBackend {
       }, SetOptions(merge: true));
 
       print('League backup completed for league: $leagueId');
-      
+
     } catch (e) {
       print('Error during backup: $e');
     }
@@ -950,33 +971,33 @@ class EcoBackend {
   Future<void> _findExistingUsers() async {
     try {
       print('=== FINDING EXISTING USERS ===');
-      
+
       // 모든 리그에서 기존 멤버들 찾기
       final leaguesSnapshot = await _fs.collection('leagues').get();
-      
+
       for (final leagueDoc in leaguesSnapshot.docs) {
         final leagueId = leagueDoc.id;
         print('Checking league: $leagueId');
-        
+
         final membersSnapshot = await _fs
             .collection('leagues')
             .doc(leagueId)
             .collection('members')
             .get();
-        
+
         for (final memberDoc in membersSnapshot.docs) {
           final memberData = memberDoc.data();
           final uid = memberDoc.id;
           final displayName = memberData['displayName'] ?? 'Unknown';
           print('Found existing member: $displayName (UID: $uid)');
-          
+
           // mb M을 찾으면 별도 로그
           if (displayName.toLowerCase().contains('mb') || displayName.toLowerCase().contains('m')) {
             print('*** POTENTIAL MB M USER: $displayName (UID: $uid) ***');
           }
         }
       }
-      
+
     } catch (e) {
       print('Error finding existing users: $e');
     }
@@ -986,32 +1007,32 @@ class EcoBackend {
   Future<void> checkLeagueStatus() async {
     try {
       print('=== LEAGUE STATUS CHECK ===');
-      
+
       final leaguesSnapshot = await _fs.collection('leagues').get();
-      
+
       for (final leagueDoc in leaguesSnapshot.docs) {
         final leagueId = leagueDoc.id;
         final leagueData = leagueDoc.data();
-        
+
         print('League: $leagueId');
         print('Data: $leagueData');
-        
+
         // Get members
         final membersSnapshot = await _fs
             .collection('leagues')
             .doc(leagueId)
             .collection('members')
             .get();
-            
+
         print('Members count: ${membersSnapshot.docs.length}');
-        
+
         for (final memberDoc in membersSnapshot.docs) {
           final memberData = memberDoc.data();
           print('  - ${memberDoc.id}: ${memberData['displayName']} (${memberData['point']} points)');
         }
         print('---');
       }
-      
+
     } catch (e) {
       print('Error checking league status: $e');
     }
@@ -1024,14 +1045,14 @@ class EcoBackend {
       // Get current user's league
       final myLeagueData = await myLeague();
       final leagueId = myLeagueData['leagueId'];
-      
+
       if (leagueId == null) {
         print('User not in any league');
         return [];
       }
-      
+
       print('Getting gardens for league: $leagueId');
-      
+
       // Get all league members
       final membersSnapshot = await _fs
           .collection('leagues')
@@ -1039,25 +1060,25 @@ class EcoBackend {
           .collection('members')
           .orderBy('point', descending: true)
           .get();
-      
+
       final List<Map<String, dynamic>> memberGardens = [];
-      
+
       for (final memberDoc in membersSnapshot.docs) {
         final memberData = memberDoc.data();
         final memberUid = memberDoc.id;
-        
+
         try {
           // Get member's garden data
           final userDoc = await _fs.collection('users').doc(memberUid).get();
-          
+
           if (userDoc.exists) {
             final userData = userDoc.data()!;
             final gardenData = userData['garden'];
-            
+
             if (gardenData != null) {
               // Process garden data
               Map<String, dynamic> processedGarden = Map<String, dynamic>.from(gardenData);
-              
+
               // Process tiles if they exist
               final rawTiles = processedGarden['tiles'];
               if (rawTiles != null) {
@@ -1071,7 +1092,7 @@ class EcoBackend {
                   processedGarden['tiles'] = tiles;
                 }
               }
-              
+
               // Add member info to garden data
               processedGarden['memberInfo'] = {
                 'uid': memberUid,
@@ -1079,9 +1100,9 @@ class EcoBackend {
                 'points': memberData['point'] ?? 0,
                 'totalPoints': userData['totalPoints'] ?? 0,
               };
-              
+
               processedGarden['size'] = processedGarden['size'] ?? 3;
-              
+
               memberGardens.add(processedGarden);
               print('Added garden for ${memberData['displayName']} (${memberData['point']} points)');
             } else {
@@ -1113,10 +1134,10 @@ class EcoBackend {
           });
         }
       }
-      
+
       print('Retrieved ${memberGardens.length} member gardens');
       return memberGardens;
-      
+
     } catch (e) {
       print('Error getting league members gardens: $e');
       return [];
@@ -1149,7 +1170,7 @@ class EcoBackend {
 
       // 현재 사용자 포인트 조회
       final currentUserPoints = await getUserPoints();
-      
+
       // 전체 사용자 중에서 현재 사용자보다 높은 포인트를 가진 사용자 수 조회
       final higherScoreUsersSnapshot = await _fs
           .collection('users')
@@ -1164,205 +1185,9 @@ class EcoBackend {
     }
   }
 
-  /*──────────────────── 펀딩 관련 기능 ────────────────────*/
-  /// 포인트로 펀딩하기
-  Future<void> fundWithPoints(String projectId, int points) async {
-    try {
-      final user = _auth.currentUser;
-      if (user == null) throw Exception('로그인이 필요합니다');
-
-      print('=== FUNDING WITH POINTS DEBUG ===');
-      print('User UID: ${user.uid}');
-      print('Project ID: $projectId');
-      print('Points to fund: $points');
-
-      // 클라이언트에서 직접 처리
-      await _fundWithPointsLocal(user.uid, projectId, points);
-      
-      print('Funding completed successfully: $points points to project $projectId');
-      
-      // 포인트 변경 알림
-      notifyPointsChanged();
-    } catch (e) {
-      print('Error funding with points: $e');
-      throw Exception('펀딩 처리 중 오류가 발생했습니다: $e');
-    }
-  }
-
-  Future<void> _fundWithPointsLocal(String uid, String projectId, int points) async {
-    try {
-      print('=== FUND WITH POINTS LOCAL DEBUG ===');
-      print('UID: $uid');
-      print('Project ID: $projectId');
-      print('Points: $points');
-      
-      // 사용자 포인트 차감을 별도 트랜잭션으로 처리
-      await _fs.runTransaction((transaction) async {
-        print('Starting user points transaction...');
-        
-        // 사용자 포인트 확인 및 차감
-        final userDocRef = _fs.collection('users').doc(uid);
-        print('Getting user document: users/$uid');
-        final userDoc = await transaction.get(userDocRef);
-        
-        if (!userDoc.exists) {
-          print('ERROR: User document does not exist');
-          throw Exception('사용자 정보를 찾을 수 없습니다');
-        }
-        
-        final userData = userDoc.data()!;
-        final currentPoints = userData['totalPoints'] ?? 0;
-        print('Current user points: $currentPoints');
-        print('Required points: $points');
-        
-        if (currentPoints < points) {
-          print('ERROR: Insufficient points');
-          throw Exception('포인트가 부족합니다. (필요: ${points}P, 보유: ${currentPoints}P)');
-        }
-        
-        print('Points sufficient, processing funding...');
-        
-        // 사용자 포인트 차감
-        transaction.update(userDocRef, {
-          'totalPoints': currentPoints - points,
-          'updatedAt': FieldValue.serverTimestamp(),
-        });
-        print('User points updated successfully');
-      });
-      
-      // 펀딩 기록 저장 (별도 처리)
-      await _fs.collection('fundings').add({
-        'userId': uid,
-        'projectId': projectId,
-        'points': points,
-        'fundedAt': FieldValue.serverTimestamp(),
-      });
-      print('Funding record created successfully');
-      
-      // 프로젝트 모금액 업데이트 (별도 트랜잭션)
-      await _updateProjectAmount(projectId, points);
-      
-      print('Transaction completed successfully');
-      print('=== FUND WITH POINTS LOCAL SUCCESS ===');
-    } catch (e, stackTrace) {
-      print('=== FUND WITH POINTS LOCAL ERROR ===');
-      print('Error: $e');
-      print('Stack trace: $stackTrace');
-      print('=====================================');
-      rethrow;
-    }
-  }
-
-  /// 프로젝트 모금액 업데이트
-  Future<void> _updateProjectAmount(String projectId, int points) async {
-    try {
-      print('=== UPDATING PROJECT AMOUNT ===');
-      print('Project ID: $projectId');
-      print('Points to add: $points');
-      
-      await _fs.runTransaction((transaction) async {
-        final projectDocRef = _fs.collection('fundingProjects').doc(projectId);
-        final projectDoc = await transaction.get(projectDocRef);
-        
-        if (projectDoc.exists) {
-          final projectData = projectDoc.data()!;
-          final currentAmount = (projectData['currentAmount'] ?? 0).toDouble();
-          final newAmount = currentAmount + points;
-          
-          transaction.update(projectDocRef, {
-            'currentAmount': newAmount,
-            'updatedAt': FieldValue.serverTimestamp(),
-          });
-          print('Project currentAmount updated: $currentAmount -> $newAmount');
-        } else {
-          print('Project document does not exist, creating with current funding...');
-          transaction.set(projectDocRef, {
-            'title': 'Fund Project $projectId',
-            'description': 'Environmental protection project',
-            'targetAmount': 1000.0,
-            'currentAmount': points.toDouble(),
-            'daysLeft': 30,
-            'createdAt': FieldValue.serverTimestamp(),
-            'updatedAt': FieldValue.serverTimestamp(),
-            'creatorUid': 'system',
-            'creatorName': 'System',
-          });
-          print('New project created with currentAmount: $points');
-        }
-      });
-      
-      print('Project amount update completed successfully');
-    } catch (e) {
-      print('Error updating project amount: $e');
-      // 프로젝트 업데이트 실패해도 사용자 포인트는 이미 차감되었으므로 로그만 남김
-    }
-  }
-
-  /// 펀딩 프로젝트 목록 조회
-  Future<List<Map<String, dynamic>>> getFundingProjects() async {
-    try {
-      print('=== GETTING FUNDING PROJECTS ===');
-      
-      // Firestore에서 직접 프로젝트 조회
-      final projectsSnapshot = await _fs.collection('fundingProjects').get();
-      
-      List<Map<String, dynamic>> projects = [];
-      
-      for (final doc in projectsSnapshot.docs) {
-        final data = doc.data();
-        projects.add({
-          'id': doc.id,
-          'title': data['title'] ?? 'Unknown Project',
-          'description': data['description'] ?? '',
-          'targetAmount': (data['targetAmount'] ?? 1000).toDouble(),
-          'currentAmount': (data['currentAmount'] ?? 0).toDouble(),
-          'daysLeft': data['daysLeft'] ?? 30,
-          'imageUrl': data['imageUrl'],
-          'createdAt': data['createdAt']?.millisecondsSinceEpoch ?? 
-                      DateTime.now().millisecondsSinceEpoch,
-          'creatorUid': data['creatorUid'] ?? 'unknown',
-          'creatorName': data['creatorName'] ?? 'Anonymous',
-        });
-      }
-      
-      print('Found ${projects.length} funding projects in Firestore');
-      
-      // Firestore에 프로젝트가 없으면 기본 프로젝트들 생성
-      if (projects.isEmpty) {
-        print('No projects found, creating default projects...');
-        await _createDefaultProjects();
-        
-        // 다시 조회
-        final newSnapshot = await _fs.collection('fundingProjects').get();
-        projects = [];
-        for (final doc in newSnapshot.docs) {
-          final data = doc.data();
-          projects.add({
-            'id': doc.id,
-            'title': data['title'] ?? 'Unknown Project',
-            'description': data['description'] ?? '',
-            'targetAmount': (data['targetAmount'] ?? 1000).toDouble(),
-            'currentAmount': (data['currentAmount'] ?? 0).toDouble(),
-            'daysLeft': data['daysLeft'] ?? 30,
-            'imageUrl': data['imageUrl'],
-            'createdAt': data['createdAt']?.millisecondsSinceEpoch ?? 
-                        DateTime.now().millisecondsSinceEpoch,
-            'creatorUid': data['creatorUid'] ?? 'unknown',
-            'creatorName': data['creatorName'] ?? 'Anonymous',
-          });
-        }
-      }
-      
-      print('Returning ${projects.length} funding projects');
-      return projects;
-    } catch (e) {
-      print('Error getting funding projects: $e');
-      throw Exception('펀딩 프로젝트를 불러올 수 없습니다: $e');
-    }
-  }
 
   /*──────────────────── 교육 및 퀴즈 관련 기능 ────────────────────*/
-  
+
   /// 교육 완료 상태 확인
   Future<bool> isLessonCompleted(int lessonId) async {
     try {
@@ -1388,7 +1213,7 @@ class EcoBackend {
     try {
       // 실제로는 Firestore에서 가져와야 하지만, 여기서는 더미 데이터 사용
       await Future.delayed(const Duration(milliseconds: 500));
-      
+
       return _getQuizzesByLessonId(lessonId);
     } catch (e) {
       print('Error getting lesson quizzes: $e');
@@ -1420,7 +1245,7 @@ class EcoBackend {
       // 퀴즈 정답 확인
       final quizzes = await getLessonQuizzes(lessonId);
       final quiz = quizzes.firstWhere(
-        (q) => q['id'] == quizId,
+            (q) => q['id'] == quizId,
         orElse: () => throw Exception('퀴즈를 찾을 수 없습니다'),
       );
 
@@ -1494,13 +1319,13 @@ class EcoBackend {
 
   /// 퀴즈 결과 저장 (내부 메서드)
   Future<void> _saveQuizResult(
-    String uid,
-    int lessonId,
-    int quizId,
-    int selectedAnswer,
-    bool isCorrect,
-    int pointsEarned,
-  ) async {
+      String uid,
+      int lessonId,
+      int quizId,
+      int selectedAnswer,
+      bool isCorrect,
+      int pointsEarned,
+      ) async {
     await _fs
         .collection('users')
         .doc(uid)
@@ -1520,7 +1345,7 @@ class EcoBackend {
     await _fs.runTransaction((transaction) async {
       final userDocRef = _fs.collection('users').doc(uid);
       final userDoc = await transaction.get(userDocRef);
-      
+
       if (userDoc.exists) {
         final currentPoints = userDoc.data()?['totalPoints'] ?? 0;
         transaction.update(userDocRef, {
@@ -1597,78 +1422,54 @@ class EcoBackend {
     return quizData[lessonId] ?? [];
   }
 
-  /// 기본 펀딩 프로젝트들 생성
-  Future<void> _createDefaultProjects() async {
-    final defaultProjects = [
-      {
-        'title': 'Clean Ocean Initiative',
-        'description': 'Support ocean cleanup and marine life protection efforts.',
-        'targetAmount': 1000.0,
-        'currentAmount': 750.0,
-        'daysLeft': 15,
-        'creatorUid': 'system',
-        'creatorName': 'Environmental Guardian',
-      },
-      {
-        'title': 'Urban Green Spaces',
-        'description': 'Create more green spaces in urban areas for better air quality.',
-        'targetAmount': 500.0,
-        'currentAmount': 300.0,
-        'daysLeft': 8,
-        'creatorUid': 'system',
-        'creatorName': 'Green City',
-      },
-      {
-        'title': 'Solar Energy for Schools',
-        'description': 'Install solar panels in schools to promote renewable energy education.',
-        'targetAmount': 2000.0,
-        'currentAmount': 1200.0,
-        'daysLeft': 25,
-        'creatorUid': 'system',
-        'creatorName': 'GreenTech',
-      },
-    ];
+  FirebaseFunctions get functions => _func;
 
-    final batch = _fs.batch();
-    
-    for (final project in defaultProjects) {
-      final docRef = _fs.collection('fundingProjects').doc();
-      batch.set(docRef, {
-        ...project,
-        'createdAt': FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
-    }
-    
-    await batch.commit();
-    print('Default funding projects created');
+  /*──────── 캠페인 단건 조회 ────────*/
+  Future<FundCampaign> getCampaign(String campaignId) async {
+    final res = await _func
+        .httpsCallable('getFundCampaign')
+        .call({'campaignId': campaignId});
+    return FundCampaign.fromJson(Map<String, dynamic>.from(res.data));
   }
 
-  /// 펀딩 프로젝트 생성
-  Future<void> createFundingProject({
-    required String title,
-    required String description,
-    required double targetAmount,
-    required int durationDays,
-    String? imageUrl,
-  }) async {
-    try {
-      final user = _auth.currentUser;
-      if (user == null) throw Exception('로그인이 필요합니다');
+  /*──────── 캠페인 목록 ────────*/
+  Future<List<FundCampaign>> listCampaigns() async {
+    final res = await _func.httpsCallable('listFundCampaigns').call();
 
-      // Cloud Function 호출 (실제 구현 시)
-      await _func.httpsCallable('createFundingProject').call({
-        'title': title,
-        'description': description,
-        'targetAmount': targetAmount,
-        'durationDays': durationDays,
-        'imageUrl': imageUrl,
-      });
-      
-      print('Funding project created: $title');
-    } catch (e) {
-      print('Error creating funding project: $e');
-      throw Exception('펀딩 프로젝트 생성 중 오류가 발생했습니다: $e');
+    // 1) res.data 를 일단 List<dynamic> 으로 받고
+    final rawList = res.data;
+    if (rawList is! List) {
+      throw Exception('Unexpected format: listFundCampaigns did not return a List');
     }
+
+    // 2) 요소 하나하나를 Map<String,dynamic> 으로 변환
+    return rawList.map<FundCampaign>((element) {
+      if (element is! Map) {
+        throw Exception('Unexpected element type in campaigns list');
+      }
+      // Map<Object?,Object?> → Map<String,dynamic>
+      final map = Map<String, dynamic>.from(
+        element.map((key, value) => MapEntry(key.toString(), value)),
+      );
+      return FundCampaign.fromJson(map);
+    }).toList();
+  }
+
+  /*──────── 캠페인 생성 ────────*/
+  Future<CreateCampaignResult> createCampaign(
+      CreateCampaignParams params) async {
+    final res =
+    await _func.httpsCallable('createFundCampaign').call(params.toJson());
+    return CreateCampaignResult.fromJson(Map<String, dynamic>.from(res.data));
+  }
+
+  /*──────── 기부 ────────*/
+  Future<void> donate({
+    required String campaignId,
+    required int amount,
+  }) async {
+    await _func
+        .httpsCallable('donateToCampaign')
+        .call({'campaignId': campaignId, 'amount': amount});
   }
 }

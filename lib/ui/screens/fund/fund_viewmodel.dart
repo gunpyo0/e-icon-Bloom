@@ -1,8 +1,10 @@
 // lib/ui/screens/fund/fund_viewmodel.dart
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:bloom/data/models/fund.dart';
 import 'package:bloom/data/services/eco_backend.dart';
+import 'package:flutter/cupertino.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-// 펀딩 프로젝트 모델
+/*──────────────── UI-friendly 모델 ────────────────*/
 class FundingProject {
   final String id;
   final String title;
@@ -28,246 +30,155 @@ class FundingProject {
     required this.creatorName,
   });
 
-  factory FundingProject.fromMap(Map<String, dynamic> data, String id) {
-    return FundingProject(
-      id: id,
-      title: data['title'] ?? 'No title',
-      description: data['description'] ?? '',
-      targetAmount: (data['targetAmount'] ?? 0).toDouble(),
-      currentAmount: (data['currentAmount'] ?? 0).toDouble(),
-      daysLeft: data['daysLeft'] ?? 0,
-      imageUrl: data['imageUrl'],
-      createdAt: DateTime.fromMillisecondsSinceEpoch(
-        data['createdAt'] ?? DateTime.now().millisecondsSinceEpoch,
-      ),
-      creatorUid: data['creatorUid'] ?? '',
-      creatorName: data['creatorName'] ?? 'Anonymous',
-    );
-  }
+  factory FundingProject.fromCampaign(FundCampaign c) => FundingProject(
+    id: c.id,
+    title: c.title,
+    description: c.description,
+    targetAmount: c.goalAmount.toDouble(),
+    currentAmount: c.collectedAmount.toDouble(),
+    daysLeft: c.endDate.difference(DateTime.now()).inDays,
+    imageUrl: null, // 필요 시 Storage URL 로 변환
+    createdAt: c.createdAt ?? DateTime.now(),
+    creatorUid: c.createdBy,
+    creatorName: c.company.name,
+  );
 
-  double get progressPercentage => 
-      targetAmount > 0 ? (currentAmount / targetAmount * 100).clamp(0, 100) : 0;
+  double get progressPercentage =>
+      targetAmount == 0 ? 0 : (currentAmount / targetAmount * 100).clamp(0, 100);
 }
 
-// 필터 타입
-enum FilterType {
-  sort,
-  newFunds,
-  search,
-}
-
-// 정렬 타입
+/*──────────────── 필터 / 정렬 enum ────────────────*/
+enum FilterType { sort, newFunds, search }
 enum SortType {
-  progressDesc, // 진행률 높은순
-  progressAsc,  // 진행률 낮은순
-  amountDesc,   // 모금액 높은순
-  amountAsc,    // 모금액 낮은순
-  newest,       // 최신순
-  oldest,       // 오래된순
-  daysLeftAsc,  // 마감 임박순
-  daysLeftDesc, // 마감 여유순
+  progressDesc, progressAsc,
+  amountDesc,  amountAsc,
+  newest, oldest,
+  daysLeftAsc, daysLeftDesc,
 }
 
-// 선택된 필터 Provider
-final selectedFilterProvider = StateProvider<FilterType>((ref) => FilterType.sort);
+/*──────────────── Providers ────────────────*/
+final selectedFilterProvider = StateProvider<FilterType>((_) => FilterType.sort);
+final selectedSortProvider   = StateProvider<SortType>((_) => SortType.progressDesc);
+final searchQueryProvider    = StateProvider<String>((_) => '');
 
-// 선택된 정렬 Provider
-final selectedSortProvider = StateProvider<SortType>((ref) => SortType.progressDesc);
-
-// 검색어 Provider
-final searchQueryProvider = StateProvider<String>((ref) => '');
-
-// 펀딩 프로젝트 목록 ViewModel
+/*──────────────── ViewModel ────────────────*/
 class FundViewModel extends AsyncNotifier<List<FundingProject>> {
   @override
-  Future<List<FundingProject>> build() async {
-    return await _loadFundingProjects();
-  }
+  Future<List<FundingProject>> build() => _fetch();
 
-  Future<List<FundingProject>> _loadFundingProjects() async {
+  Future<List<FundingProject>> _fetch() async {
     try {
-      // EcoBackend를 통해 실제 Firestore 데이터 가져오기
-      final projectsData = await EcoBackend.instance.getFundingProjects();
-      
-      return projectsData.map((data) => FundingProject.fromMap(data, data['id'])).toList();
-    } catch (e) {
-      throw Exception('Failed to load funding projects: $e');
+      final campaigns = await EcoBackend.instance.listCampaigns();
+      debugPrint('🔥 campaigns length = ${campaigns.length}');
+      return campaigns.map(FundingProject.fromCampaign).toList();
+    } catch (e, st) {
+      debugPrint('❌ _fetch error: $e\n$st');
+      rethrow;
     }
   }
 
-  // 펀딩 프로젝트 생성
-  Future<void> createFundingProject({
-    required String title,
-    required String description,
-    required double targetAmount,
-    required int durationDays,
-    String? imageUrl,
-  }) async {
-    try {
-      // 실제 구현시 Firebase Functions 호출
-      // await EcoBackend.instance.createFundingProject({
-      //   'title': title,
-      //   'description': description,
-      //   'targetAmount': targetAmount,
-      //   'durationDays': durationDays,
-      //   'imageUrl': imageUrl,
-      // });
-      
-      // 성공 후 목록 새로고침
-      await refresh();
-    } catch (e) {
-      throw Exception('Failed to create funding project: $e');
-    }
-  }
-
-  // 펀딩 참여
-  Future<void> fundProject(String projectId, double amount) async {
-    try {
-      // 실제 구현시 Firebase Functions 호출
-      // await EcoBackend.instance.fundProject({
-      //   'projectId': projectId,
-      //   'amount': amount,
-      // });
-      
-      // 성공 후 목록 새로고침
-      await refresh();
-    } catch (e) {
-      throw Exception('Failed to participate in funding: $e');
-    }
-  }
-
-  // 새로고침
+  /*── 새로고침 ─*/
   Future<void> refresh() async {
     state = const AsyncValue.loading();
-    state = await AsyncValue.guard(() => _loadFundingProjects());
+    state = await AsyncValue.guard(_fetch);
   }
 
-  // 필터링된 프로젝트 목록
-  List<FundingProject> getFilteredProjects(FilterType filter, String searchQuery) {
-    final projects = state.value ?? [];
-    
-    List<FundingProject> filtered = projects;
-    
-    // 검색어 필터링
-    if (searchQuery.isNotEmpty) {
-      filtered = filtered.where((project) =>
-          project.title.toLowerCase().contains(searchQuery.toLowerCase()) ||
-          project.description.toLowerCase().contains(searchQuery.toLowerCase())
-      ).toList();
+  /*── 기부 참여 ─*/
+  Future<void> donate({
+    required String campaignId,
+    required int amount,
+  }) async {
+    await EcoBackend.instance.donate(campaignId: campaignId, amount: amount);
+    await refresh();
+  }
+
+  /*── 필터링 ─*/
+  List<FundingProject> getFilteredProjects(FilterType filter, String q) {
+    var list = state.value ?? [];
+
+    /* 검색어 */
+    if (q.isNotEmpty) {
+      final lower = q.toLowerCase();
+      list = list.where((p) =>
+      p.title.toLowerCase().contains(lower) ||
+          p.description.toLowerCase().contains(lower)).toList();
     }
-    
-    // 정렬
+
+    /* 기본 정렬 */
     switch (filter) {
       case FilterType.sort:
-        // 진행률 순으로 정렬
-        filtered.sort((a, b) => b.progressPercentage.compareTo(a.progressPercentage));
+        list.sort((a,b) => b.progressPercentage.compareTo(a.progressPercentage));
         break;
       case FilterType.newFunds:
-        // 생성일 순으로 정렬
-        filtered.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        list.sort((a,b) => b.createdAt.compareTo(a.createdAt));
         break;
       case FilterType.search:
-        // 검색 관련성 순 (여기서는 단순히 이름순)
-        filtered.sort((a, b) => a.title.compareTo(b.title));
+        list.sort((a,b) => a.title.compareTo(b.title));
         break;
     }
-    
-    return filtered;
+    return list;
   }
 
-  // 정렬된 프로젝트 목록
-  List<FundingProject> getSortedProjects(SortType sortType, String searchQuery) {
-    final projects = state.value ?? [];
-    
-    List<FundingProject> filtered = projects;
-    
-    // 검색어 필터링
-    if (searchQuery.isNotEmpty) {
-      filtered = filtered.where((project) =>
-          project.title.toLowerCase().contains(searchQuery.toLowerCase()) ||
-          project.description.toLowerCase().contains(searchQuery.toLowerCase())
-      ).toList();
+  /*── 커스텀 정렬 ─*/
+  List<FundingProject> getSortedProjects(SortType sort, String q) {
+    var list = state.value ?? [];
+
+    /* 검색어 */
+    if (q.isNotEmpty) {
+      final lower = q.toLowerCase();
+      list = list.where((p) =>
+      p.title.toLowerCase().contains(lower) ||
+          p.description.toLowerCase().contains(lower)).toList();
     }
-    
-    // 정렬
-    switch (sortType) {
-      case SortType.progressDesc:
-        // 진행률 높은순
-        filtered.sort((a, b) => b.progressPercentage.compareTo(a.progressPercentage));
-        break;
-      case SortType.progressAsc:
-        // 진행률 낮은순
-        filtered.sort((a, b) => a.progressPercentage.compareTo(b.progressPercentage));
-        break;
-      case SortType.amountDesc:
-        // 모금액 높은순
-        filtered.sort((a, b) => b.currentAmount.compareTo(a.currentAmount));
-        break;
-      case SortType.amountAsc:
-        // 모금액 낮은순
-        filtered.sort((a, b) => a.currentAmount.compareTo(b.currentAmount));
-        break;
-      case SortType.newest:
-        // 최신순
-        filtered.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-        break;
-      case SortType.oldest:
-        // 오래된순
-        filtered.sort((a, b) => a.createdAt.compareTo(b.createdAt));
-        break;
-      case SortType.daysLeftAsc:
-        // 마감 임박순
-        filtered.sort((a, b) => a.daysLeft.compareTo(b.daysLeft));
-        break;
-      case SortType.daysLeftDesc:
-        // 마감 여유순
-        filtered.sort((a, b) => b.daysLeft.compareTo(a.daysLeft));
-        break;
+
+    switch (sort) {
+      case SortType.progressDesc:  list.sort((a,b)=>b.progressPercentage.compareTo(a.progressPercentage)); break;
+      case SortType.progressAsc:   list.sort((a,b)=>a.progressPercentage.compareTo(b.progressPercentage)); break;
+      case SortType.amountDesc:    list.sort((a,b)=>b.currentAmount.compareTo(a.currentAmount));           break;
+      case SortType.amountAsc:     list.sort((a,b)=>a.currentAmount.compareTo(b.currentAmount));           break;
+      case SortType.newest:        list.sort((a,b)=>b.createdAt.compareTo(a.createdAt));                   break;
+      case SortType.oldest:        list.sort((a,b)=>a.createdAt.compareTo(b.createdAt));                   break;
+      case SortType.daysLeftAsc:   list.sort((a,b)=>a.daysLeft.compareTo(b.daysLeft));                     break;
+      case SortType.daysLeftDesc:  list.sort((a,b)=>b.daysLeft.compareTo(a.daysLeft));                     break;
     }
-    
-    return filtered;
+    return list;
   }
 }
 
-// Provider
-final fundViewModelProvider = AsyncNotifierProvider<FundViewModel, List<FundingProject>>(
-  () => FundViewModel(),
+/*──────────────── Provider 연결 ────────────────*/
+final fundViewModelProvider =
+AsyncNotifierProvider<FundViewModel, List<FundingProject>>(
+      () => FundViewModel(),
 );
 
-// 필터링된 펀딩 프로젝트 목록 Provider (기존 방식)
 final filteredFundingProjectsProvider = Provider<List<FundingProject>>((ref) {
-  final projects = ref.watch(fundViewModelProvider);
-  final filter = ref.watch(selectedFilterProvider);
-  final searchQuery = ref.watch(searchQueryProvider);
-  
-  return projects.when(
-    data: (data) => ref.read(fundViewModelProvider.notifier)
-        .getFilteredProjects(filter, searchQuery),
+  final vm  = ref.watch(fundViewModelProvider);
+  final ft  = ref.watch(selectedFilterProvider);
+  final q   = ref.watch(searchQueryProvider);
+
+  return vm.when(
+    data: (list) => ref.read(fundViewModelProvider.notifier)
+        .getFilteredProjects(ft, q),
     loading: () => [],
     error: (_, __) => [],
   );
 });
 
-// 정렬된 펀딩 프로젝트 목록 Provider (새로운 방식)
 final sortedFundingProjectsProvider = Provider<List<FundingProject>>((ref) {
-  final projects = ref.watch(fundViewModelProvider);
-  final sortType = ref.watch(selectedSortProvider);
-  final searchQuery = ref.watch(searchQueryProvider);
-  
-  return projects.when(
-    data: (data) => ref.read(fundViewModelProvider.notifier)
-        .getSortedProjects(sortType, searchQuery),
+  final vm  = ref.watch(fundViewModelProvider);
+  final st  = ref.watch(selectedSortProvider);
+  final q   = ref.watch(searchQueryProvider);
+
+  return vm.when(
+    data: (list) => ref.read(fundViewModelProvider.notifier)
+        .getSortedProjects(st, q),
     loading: () => [],
     error: (_, __) => [],
   );
 });
 
-// 특정 펀딩 프로젝트 상세 정보 Provider
-final fundingProjectDetailProvider = FutureProvider.family<FundingProject?, String>((ref, projectId) async {
-  final projects = await ref.watch(fundViewModelProvider.future);
-  try {
-    return projects.firstWhere((project) => project.id == projectId);
-  } catch (e) {
-    return null;
-  }
+final fundingProjectDetailProvider =
+FutureProvider.family<FundingProject?, String>((ref, id) async {
+  final list = await ref.watch(fundViewModelProvider.future);
+  return list.firstWhere((p) => p.id == id);
 });
