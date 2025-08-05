@@ -182,3 +182,10 @@ FutureProvider.family<FundingProject?, String>((ref, id) async {
   final list = await ref.watch(fundViewModelProvider.future);
   return list.firstWhere((p) => p.id == id);
 });
+final fundLoadingProvider = Provider<bool>((ref) {
+  final async = ref.watch(fundViewModelProvider);
+  return async.maybeWhen(
+    loading: () => true,
+    orElse: ()  => false,
+  );
+});

@@ -1,4 +1,5 @@
     import 'package:bloom/data/models/lesson_models.dart';
+import 'package:bloom/providers/points_provider.dart';
 import 'package:flutter/material.dart';
     import 'package:flutter_riverpod/flutter_riverpod.dart';
     import 'package:bloom/data/services/eco_backend.dart';
@@ -7,11 +8,14 @@ import 'package:flutter/material.dart';
     class LessonDetailScreen extends ConsumerStatefulWidget {
       final int lessonId;
       final String lessonTitle;
+      final int initialStep;
 
       const LessonDetailScreen({
         super.key,
         required this.lessonId,
         required this.lessonTitle,
+        this.initialStep = 0,
+
       });
 
       @override
@@ -27,7 +31,8 @@ import 'package:flutter/material.dart';
       @override
       void initState() {
         super.initState();
-          _loadSteps();
+        _currentStep = widget.initialStep;   // ⭐️ 기본값 세팅
+        _loadSteps();
       }
 
       Future<void> _loadSteps() async {
@@ -446,15 +451,21 @@ import 'package:flutter/material.dart';
         );
       }
 
-      void _nextStep() {
-        if (_currentStep < _lessonSteps.length - 1) {
-          setState(() {
-            _currentStep++;
-          });
+      void _nextStep() async {
+        final stepInfo = await EcoBackend.instance.nextStep(
+          Stepadder(lessonId: widget.lessonId.toString(), step: _currentStep),
+        );
+
+        if (!mounted) return;
+        if (stepInfo['addPoint'] > 0) {
+          // 즉시 포인트 반영
+          ref.read(pointsProvider.notifier).refresh();
+        }
+
+        if (stepInfo['isLessonDone'] == true) {
+          setState(() => _isCompleted = true);
         } else {
-          setState(() {
-            _isCompleted = true;
-          });
+          setState(() => _currentStep++);
         }
       }
 

@@ -145,88 +145,9 @@ class EcoBackend {
   }
 
   Future<Map<String, dynamic>> myLeague() async {
-    try {
-      // 임시로 Cloud Function 대신 클라이언트에서 직접 처리
-      return await _getMyLeagueLocal();
-    } catch (e) {
-      print('Local league lookup failed, trying cloud function: $e');
-      // 실패하면 원래 방식 시도
-      return (await _func.httpsCallable('getMyLeague').call()).data;
-    }
+    return (await _func.httpsCallable('getMyLeague').call()).data;
   }
 
-  Future<Map<String, dynamic>> _getMyLeagueLocal() async {
-    final uid = currentUser?.uid;
-    if (uid == null) {
-      throw Exception('No authenticated user');
-    }
-
-    print('Looking up league for user: $uid');
-
-    // Find leagues where user is a member
-    final leaguesSnapshot = await _fs.collection('leagues').get();
-
-    for (final leagueDoc in leaguesSnapshot.docs) {
-      final leagueId = leagueDoc.id;
-      final leagueData = leagueDoc.data();
-
-      // Check if user is member of this league
-      final memberDoc = await _fs
-          .collection('leagues')
-          .doc(leagueId)
-          .collection('members')
-          .doc(uid)
-          .get();
-
-      if (memberDoc.exists) {
-        // Get all members ordered by points (descending)
-        final membersSnapshot = await _fs
-            .collection('leagues')
-            .doc(leagueId)
-            .collection('members')
-            .orderBy('point', descending: true)
-            .get();
-
-        // Calculate actual rank and member count
-        int rank = 1;
-        int actualMemberCount = 0;
-
-        for (int i = 0; i < membersSnapshot.docs.length; i++) {
-          final doc = membersSnapshot.docs[i];
-          final memberData = doc.data();
-          // Only count valid members (with displayName)
-          if (memberData['displayName'] != null &&
-              memberData['displayName'].toString().trim().isNotEmpty) {
-            actualMemberCount++;
-            if (doc.id == uid) {
-              rank = actualMemberCount; // Use actual rank based on valid members
-            }
-          }
-        }
-
-        print('User found in league $leagueId, rank: $rank, members: $actualMemberCount');
-
-        return {
-          'leagueId': leagueId,
-          'league': {
-            ...leagueData,
-            'memberCount': actualMemberCount // Use actual member count
-          },
-          'rank': rank,
-          'memberCount': actualMemberCount
-        };
-      }
-    }
-
-    // User not in any league
-    print('User $uid not found in any league');
-    return {
-      'leagueId': null,
-      'league': null,
-      'rank': null,
-      'memberCount': 0
-    };
-  }
 
   Future<Map<String, dynamic>> anotherProfile(String uid) async =>
       (await _func.httpsCallable('getUserProfile')
@@ -1398,4 +1319,45 @@ class EcoBackend {
         .toList();
   }
 
+  /*════════════ Lessons helpers ════════════*/
+
+  /// A. 단계 완료 → Cloud Function `completeStep`
+  Future<Map<String, dynamic>> nextStep(Stepadder s) async {
+    final res = await _func.httpsCallable('completeStep').call(s.toJson());
+    final data = Map<String, dynamic>.from(res.data);
+    notifyPointsChanged();                          // 단계 완료 시 포인트 변동 가능
+    return data;                                    // {highestStep,isLessonDone,addPoint}
+  }
+
+  /// B. 퀴즈 채점  → Cloud Function `answerQuiz`
+  Future<Map<String, dynamic>> answerQuiz({
+    required String lessonId,
+    required String quizId,
+    required int    answerIdx,
+  }) async {
+    final res = await _func.httpsCallable('answerQuiz').call({
+      'lessonId' : lessonId,
+      'quizId'   : quizId,
+      'answerIdx': answerIdx,
+    });
+    final data = Map<String, dynamic>.from(res.data);
+    if ((data['awarded'] ?? 0) > 0) notifyPointsChanged();
+    return data;                                    // {isCorrect,awarded,alreadyAnswered}
+  }
+
+  // lib/services/eco_backend.dart
+/*════════════ Lessons helpers ════════════*/
+  /// C. 진행 현황 1건 읽기 (Firestore 직통)
+  Future<Map<String, dynamic>> lessonProgress(String lessonId) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return _emptyProgress;
+    final snap = await _fs.doc('users/$uid/progress/$lessonId').get();
+    return snap.exists ? snap.data()! : _emptyProgress;
+  }
+
+  static const _emptyProgress = {
+    'highestStep': -1,
+    'isLessonDone': false,
+    'quizDone': false,
+  };
 }

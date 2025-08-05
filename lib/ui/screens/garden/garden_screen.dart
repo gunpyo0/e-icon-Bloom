@@ -4,7 +4,6 @@ import 'package:bloom/data/services/eco_backend.dart';
 import 'package:bloom/data/models/crop.dart';
 import 'package:bloom/ui/screens/profile/profile_screen.dart';
 import 'package:bloom/providers/points_provider.dart';
-import 'flame_garden_widget.dart';
 
 final gardenProvider = FutureProvider<Garden>((ref) async {
   final gardenData = await EcoBackend.instance.myGarden();
@@ -304,10 +303,7 @@ class _GardenScreenState extends ConsumerState<GardenScreen> with SingleTickerPr
               maxWidth: MediaQuery.of(context).size.width - 40,
               maxHeight: MediaQuery.of(context).size.width - 40,
             ),
-            child: FlameGardenWidget(
-              garden: garden,
-              onRefresh: () => ref.refresh(gardenProvider),
-            ),
+
           ),
         ),
       ),

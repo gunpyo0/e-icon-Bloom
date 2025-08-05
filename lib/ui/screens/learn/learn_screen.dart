@@ -1,34 +1,82 @@
+// learn_screen.dart – Learn 페이지 (자동 새로고침 & 풀투리프레시)
+// =============================================================
+// 🔸 앱이 포그라운드로 돌아오거나 탭 전환 시 invalidate
+// 🔸 디테일 화면에서 돌아오면 해당 레슨/프로바이더만 새로고침
+// 🔸 RefreshIndicator 로 당겨서 새로고침도 지원
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:bloom/data/services/eco_backend.dart';
 import 'package:bloom/data/models/lesson_models.dart';
+import 'package:bloom/data/services/eco_backend.dart';
 import 'lesson_detail_screen.dart';
 
 enum LessonStatus { locked, available, completed }
 
-/// ───────── Provider – 레슨 목록 ─────────
-final lessonsProvider = FutureProvider<List<LessonMeta>>((ref) async {
-  return EcoBackend.instance.listLessons();
+/*──────────────────────── Providers ────────────────────────*/
+final lessonsProvider = FutureProvider.autoDispose<List<LessonMeta>>( (ref) => EcoBackend.instance.listLessons());
+final progressProvider = FutureProvider.family<Map<String, dynamic>, String>((ref, lessonId) => EcoBackend.instance.lessonProgress(lessonId));
+final isDoneProvider = FutureProvider.family<bool, String>((ref, lessonId) async {
+  final p = await EcoBackend.instance.lessonProgress(lessonId);
+  return p['isLessonDone'] == true && p['quizDone'] == true;
 });
+/*────────────────────────────────────────────────────────────*/
 
-class LearnScreen extends ConsumerWidget {
+class LearnScreen extends ConsumerStatefulWidget {
   const LearnScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<LearnScreen> createState() => _LearnScreenState();
+}
+
+class _LearnScreenState extends ConsumerState<LearnScreen> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _refreshLessons();
+    }
+  }
+
+  /*──────────────── helpers ───────────────*/
+  Future<void> _refreshLessons() async {
+    ref.invalidate(lessonsProvider);
+  }
+
+  /*──────────────── UI ───────────────*/
+  @override
+  Widget build(BuildContext context) {
     final asyncLessons = ref.watch(lessonsProvider);
 
     return asyncLessons.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error  : (e, st) => Center(child: Text('Error: $e')),
-      data   : (lessons) => _buildBody(context, lessons),
+      error: (e, _) => Center(child: Text('Error: $e')),
+      data: (lessons) => RefreshIndicator(
+        onRefresh: _refreshLessons,
+        child: _body(context, lessons),
+      ),
     );
   }
 
-  Widget _buildBody(BuildContext ctx, List<LessonMeta> lessons) {
-    /// themeId → LessonMeta 리스트로 그룹화
-    final Map<String, List<LessonMeta>> grouped = {};
-    for (final l in lessons) {
+  Widget _body(BuildContext ctx, List<LessonMeta> lessons) {
+    final filtered = lessons.where((l) {
+      final okId = int.tryParse(l.id) != null && int.parse(l.id) > 0;
+      final okTitle = l.title.trim().isNotEmpty;
+      return okId && okTitle;
+    }).toList();
+
+    final grouped = <String, List<LessonMeta>>{};
+    for (final l in filtered) {
       grouped.putIfAbsent(l.themeId, () => []).add(l);
     }
 
@@ -36,180 +84,114 @@ class LearnScreen extends ConsumerWidget {
       color: Colors.green[50],
       child: ListView(
         padding: const EdgeInsets.all(20),
-        children: grouped.entries.map((e) {
-          final first = e.value.first;
-          return _ThemeSection(metaList: e.value, color: first.themeColor);
-        }).toList(),
+        children: grouped.entries.map((e) => _ThemeSection(metaList: e.value, color: e.value.first.themeColor)).toList(growable: false),
       ),
     );
   }
 }
 
-/// ───────── Theme 섹션 위젯 ─────────
+/*──────────────────── Theme 섹션 ────────────────────*/
 class _ThemeSection extends ConsumerWidget {
-  final List<LessonMeta> metaList;
-  final Color color;
-
+  final List<LessonMeta> metaList; final Color color;
   const _ThemeSection({required this.metaList, required this.color});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final themeTitle = metaList.first.themeTitle;
-    final themeDesc  = metaList.first.themeDesc;
-    final themeIcon  = metaList.first.themeIcon;
-
+    final first = metaList.first;
     return Container(
       margin: const EdgeInsets.only(bottom: 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // header
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: _cardDeco(top: true),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: color.withOpacity(.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(themeIcon, color: color, size: 28),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(themeTitle,
-                          style: const TextStyle(
-                              fontSize: 18, fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 4),
-                      Text(themeDesc,
-                          style:
-                          TextStyle(fontSize: 14, color: Colors.grey[700])),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          // lesson list
-          Container(
-            decoration: _cardDeco(),
-            child: Column(
-              children: metaList.map((m) {
-                final idx = metaList.indexOf(m);
-                final isLast = idx == metaList.length - 1;
-                return Column(
-                  children: [
-                    _LessonTile(meta: m, themeColor: color),
-                    if (!isLast) Divider(height: 1, color: Colors.grey[200]),
-                  ],
-                );
-              }).toList(),
-            ),
-          ),
-        ],
-      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        // Header
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: _cardDeco(top: true),
+          child: Row(children: [
+            Container(padding: const EdgeInsets.all(12), child: const Text('Learn', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold))),
+            const SizedBox(width: 16),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(first.themeTitle, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 4),
+              Text(first.themeDesc, style: TextStyle(fontSize: 14, color: Colors.grey[700])),
+            ])),
+          ]),
+        ),
+        // Lesson list
+        Container(
+          decoration: _cardDeco(),
+          child: Column(children: [
+            for (var i = 0; i < metaList.length; i++) ...[
+              _LessonTile(meta: metaList[i], themeColor: color),
+              if (i < metaList.length - 1) Divider(height: 1, color: Colors.grey[200]),
+            ],
+          ]),
+        ),
+      ]),
     );
   }
 
-  BoxDecoration _cardDeco({bool top = false}) {
-    return BoxDecoration(
-      color: Colors.white,
-      borderRadius: top
-          ? const BorderRadius.only(
-          topLeft: Radius.circular(12), topRight: Radius.circular(12))
-          : const BorderRadius.only(
-          bottomLeft: Radius.circular(12),
-          bottomRight: Radius.circular(12)),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withOpacity(0.08),
-          blurRadius: 8,
-          offset: const Offset(0, 2),
-        ),
-      ],
-    );
-  }
+  BoxDecoration _cardDeco({bool top = false}) => BoxDecoration(
+    color: Colors.white,
+    borderRadius: top
+        ? const BorderRadius.only(topLeft: Radius.circular(12), topRight: Radius.circular(12))
+        : const BorderRadius.only(bottomLeft: Radius.circular(12), bottomRight: Radius.circular(12)),
+    boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 8, offset: const Offset(0, 2))],
+  );
 }
 
-/// ───────── Lesson 타일 ─────────
+/*──────────────────── Lesson 타일 ────────────────────*/
 class _LessonTile extends ConsumerWidget {
-  final LessonMeta meta;
-  final Color themeColor;
-
+  final LessonMeta meta; final Color themeColor;
   const _LessonTile({required this.meta, required this.themeColor});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // 완료 여부 실시간 확인
-    final completedAsync =
-    ref.watch(_completedProvider(meta.id)); // provider below
+    final progAsync = ref.watch(progressProvider(meta.id));
 
-    return completedAsync.when(
-      loading: () => _tile(context, LessonStatus.available, false),
-      error  : (_, __) => _tile(context, LessonStatus.available, false),
-      data   : (done)  =>
-          _tile(context, done ? LessonStatus.completed : LessonStatus.available,
-              done),
+    return progAsync.when(
+      loading: () => _tile(context, ref, LessonStatus.available, 0, false),
+      error: (_, __) => _tile(context, ref, LessonStatus.available, 0, false),
+      data: (p) {
+        final done = p['isLessonDone'] == true && p['quizDone'] == true;
+        final nextStep = (p['highestStep'] ?? -1) + 1;
+        final status = done ? LessonStatus.completed : LessonStatus.available;
+        return _tile(context, ref, status, nextStep, done);
+      },
     );
   }
 
-  Widget _tile(BuildContext ctx, LessonStatus status, bool done) {
+  Widget _tile(BuildContext ctx, WidgetRef ref, LessonStatus status, int nextStep, bool done) {
     Color c; IconData icon; String label;
     switch (status) {
-      case LessonStatus.available:
-        c = themeColor; icon = Icons.play_circle; label = 'Learn';
-        break;
       case LessonStatus.completed:
-        c = Colors.green; icon = Icons.check_circle; label = 'Completed';
-        break;
+        c = Colors.green; icon = Icons.check_circle; label = 'Completed'; break;
+      case LessonStatus.available:
+        c = themeColor; icon = nextStep > 0 ? Icons.play_circle : Icons.play_arrow; label = nextStep > 0 ? 'Continue • Step $nextStep' : 'Start'; break;
       case LessonStatus.locked:
-        c = Colors.grey; icon = Icons.lock; label = 'Locked';
-        break;
+        c = Colors.grey; icon = Icons.lock; label = 'Locked'; break;
     }
 
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-      leading: Container(
-        width: 50, height: 50,
-        decoration: BoxDecoration(
-          color: c.withOpacity(.1),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Icon(meta.themeIcon, color: c, size: 24),
-      ),
-      title: Text(meta.title,
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-      subtitle: Text('Step ${meta.totalSteps}  |  Quiz 3',
-          style: TextStyle(color: Colors.grey[600])),
-      trailing: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-            color: c.withOpacity(.1), borderRadius: BorderRadius.circular(16)),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Icon(icon, size: 16, color: c),
-          const SizedBox(width: 4),
-          Text(label,
-              style: TextStyle(
-                  fontSize: 12, fontWeight: FontWeight.bold, color: c)),
-        ]),
-      ),
-      onTap: () => Navigator.of(ctx).push(MaterialPageRoute(
-        builder: (_) => LessonDetailScreen(
-          lessonId: int.parse(meta.id),
-          lessonTitle: meta.title,
-        ),
-      )),
+      leading: Container(width: 50, height: 50, decoration: BoxDecoration(color: themeColor.withOpacity(.1), borderRadius: BorderRadius.circular(12)), child: Icon(meta.themeIcon, color: themeColor, size: 24)),
+      title: Text(meta.title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+      subtitle: Text('Step ${meta.totalSteps}  |  Quiz 3', style: TextStyle(color: Colors.grey[600])),
+      trailing: _pill(c, icon, label),
+      onTap: () async {
+        await Navigator.of(ctx).push(MaterialPageRoute(builder: (_) => LessonDetailScreen(lessonId: int.parse(meta.id), lessonTitle: meta.title, initialStep: done ? 0 : nextStep)));
+        if (ctx.mounted) {
+          // 디테일에서 돌아오면 해당 레슨 진행 + 전체 목록 새로고침
+          ref.invalidate(progressProvider(meta.id));
+          ref.invalidate(lessonsProvider);
+        }
+      },
     );
   }
-}
 
-/// ─── per-lesson completed cache (FutureProvider.family) ───
-final _completedProvider =
-FutureProvider.family<bool, String>((ref, lessonId) async {
-  return EcoBackend.instance.isLessonCompleted(lessonId);
-});
+  Widget _pill(Color c, IconData icon, String label) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+    decoration: BoxDecoration(color: c.withOpacity(.1), borderRadius: BorderRadius.circular(16)),
+    child: Row(mainAxisSize: MainAxisSize.min, children: [
+      Icon(icon, size: 16, color: c), const SizedBox(width: 4), Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: c)),
+    ]),
+  );
+}

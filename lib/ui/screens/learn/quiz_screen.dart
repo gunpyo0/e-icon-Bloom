@@ -68,23 +68,21 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
     });
 
     try {
-      final result = await EcoBackend.instance.submitQuizAnswer(
-        lessonId: widget.lessonId,
-        quizId: quizzes[currentQuizIndex].id,
-        answerIndex: selectedAnswer!,
+      final result = await EcoBackend.instance.answerQuiz(
+        lessonId : widget.lessonId,
+        quizId   : quizzes[currentQuizIndex].id,
+        answerIdx: selectedAnswer!,
       );
 
-      // Save result
       quizResults.add({
-        'quizId': quizzes[currentQuizIndex].id,
+        'quizId'           : quizzes[currentQuizIndex].id,
         'selectedAnswerIndex': selectedAnswer!,
-        'isCorrect': result['isCorrect'],
-        'pointsEarned': result['pointsEarned'],
+        'isCorrect'        : result['isCorrect'],
+        'pointsEarned'     : result['awarded'],          // ← 필드명 맞춤
       });
 
-      // Update points immediately
-      if (result['isCorrect'] == true && result['pointsEarned'] > 0) {
-        ref.read(pointsProvider.notifier).addPoints(result['pointsEarned']);
+      if (result['awarded'] is int && result['awarded'] > 0) {
+        ref.read(pointsProvider.notifier).refresh();
       }
 
       setState(() {

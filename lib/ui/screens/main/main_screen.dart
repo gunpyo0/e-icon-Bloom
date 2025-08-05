@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:bloom/data/models/crop.dart';
 import 'package:bloom/data/services/eco_backend.dart';
-import 'package:bloom/ui/screens/garden/flame_garden_widget.dart';
 import 'package:bloom/ui/screens/garden/garden_screen.dart';
 import 'package:bloom/ui/screens/profile/profile_screen.dart';
 import 'package:bloom/providers/points_provider.dart';
@@ -72,7 +71,6 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
     super.build(context); // AutomaticKeepAliveClientMixin 필요
     
     final pointsAsync = ref.watch(pointsProvider);
-    final gardenAsync = ref.watch(gardenProvider);
     
     // 디버그: 포인트 상태 로그
     pointsAsync.when(
@@ -88,7 +86,6 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
           : RefreshIndicator(
               onRefresh: () async {
                 await ref.read(pointsProvider.notifier).refresh();
-                ref.refresh(gardenProvider);
                 await _loadData();
               },
               child: SingleChildScrollView(
@@ -333,145 +330,7 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
                     ],
                   ),
                   const SizedBox(height: 12),
-                  
-                  // Garden section
-                  gardenAsync.when(
-                    data: (garden) =>
-                    Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.1),
-                            blurRadius: 15,
-                            offset: const Offset(0, 5),
-                          ),
-                        ],
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(20),
-                        child: Stack(
-                          children: [
-                            // Garden preview (scaled down version)
-                            SizedBox(
-                              height: 200,
-                              child: FlameGardenWidget(
-                                garden: garden,
-                                onRefresh: () {
-                                  ref.refresh(gardenProvider);
-                                  ref.read(pointsProvider.notifier).refresh();
-                                },
-                              ),
-                            ),
-                            // Click overlay
-                            Positioned.fill(
-                              child: Material(
-                                color: Colors.transparent,
-                                child: InkWell(
-                                  borderRadius: BorderRadius.circular(20),
-                                  onTap: () {
-                                    context.push('/garden');
-                                  },
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(20),
-                                      gradient: LinearGradient(
-                                        begin: Alignment.topCenter,
-                                        end: Alignment.bottomCenter,
-                                        colors: [
-                                          Colors.transparent,
-                                          Colors.black.withOpacity(0.1),
-                                        ],
-                                      ),
-                                    ),
-                                    child: Center(
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 24,
-                                          vertical: 12,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: Colors.white.withOpacity(0.9),
-                                          borderRadius: BorderRadius.circular(25),
-                                        ),
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Icon(
-                                              Icons.eco,
-                                              color: Colors.green.shade600,
-                                            ),
-                                            const SizedBox(width: 8),
-                                            Text(
-                                              'View Garden',
-                                              style: TextStyle(
-                                                color: Colors.green.shade600,
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    loading: () => Container(
-                      height: 200,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.1),
-                            blurRadius: 15,
-                            offset: const Offset(0, 5),
-                          ),
-                        ],
-                      ),
-                      child: const Center(
-                        child: CircularProgressIndicator(),
-                      ),
-                    ),
-                    error: (error, stack) => Container(
-                      height: 200,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.1),
-                            blurRadius: 15,
-                            offset: const Offset(0, 5),
-                          ),
-                        ],
-                      ),
-                      child: Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.error_outline, size: 48, color: Colors.red[300]),
-                            const SizedBox(height: 16),
-                            Text(
-                              'Cannot load garden',
-                              style: TextStyle(fontSize: 16, color: Colors.red[600]),
-                            ),
-                            const SizedBox(height: 16),
-                            ElevatedButton(
-                              onPressed: () => ref.refresh(gardenProvider),
-                              child: const Text('Retry'),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
+
                   
                   const SizedBox(height: 24),
                   
