@@ -1,3 +1,4 @@
+import 'package:bloom/ui/screens/fund/fund_create_screen.dart';
 import 'package:bloom/ui/screens/fund/fund_screen.dart';
 import 'package:bloom/ui/screens/fund/fund_detail_screen.dart';
 import 'package:bloom/ui/screens/auth/login_screen.dart';
@@ -39,6 +40,10 @@ final appRouter = GoRouter(
       builder: (context, state) => const ProfileScreen(),
     ),
     GoRoute(
+      path: '/fund/create',
+      builder: (context, state) => const FundCreateScreen(),
+    ),
+    GoRoute(
       path: '/fund/:fundId',
       builder: (context, state) {
         final fundId = state.pathParameters['fundId']!;
@@ -49,6 +54,7 @@ final appRouter = GoRouter(
       path: '/debug',
       builder: (context, state) => const EcoDebugPage(),
     ),
+
   ],
 );
 

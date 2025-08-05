@@ -1,3 +1,5 @@
+
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'fund_viewmodel.dart';
@@ -6,7 +8,7 @@ import 'package:bloom/providers/points_provider.dart';
 
 class FundDetailScreen extends ConsumerWidget {
   final String fundId;
-  
+
   const FundDetailScreen({
     super.key,
     required this.fundId,
@@ -15,7 +17,7 @@ class FundDetailScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final fundState = ref.watch(fundViewModelProvider);
-    
+
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
@@ -59,7 +61,7 @@ class FundDetailScreen extends ConsumerWidget {
             (p) => p.id == fundId,
             orElse: () => projects.first,
           );
-          
+
           return SingleChildScrollView(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -83,7 +85,7 @@ class FundDetailScreen extends ConsumerWidget {
       color: Colors.black,
       child: Stack(
         children: [
-          project.imageUrl != null 
+          project.imageUrl != null
             ? Image.network(
                 project.imageUrl!,
                 width: double.infinity,
@@ -109,7 +111,7 @@ class FundDetailScreen extends ConsumerWidget {
                   size: 48,
                 ),
               ),
-          
+
           Positioned(
             bottom: 20,
             left: 20,
@@ -143,7 +145,7 @@ class FundDetailScreen extends ConsumerWidget {
 
   Widget _buildProjectInfo(BuildContext context, FundingProject project) {
     final progressPercentage = (project.currentAmount / project.targetAmount * 100).clamp(0, 100);
-    
+
     return Container(
       padding: const EdgeInsets.all(20),
       margin: const EdgeInsets.all(20),
@@ -169,7 +171,7 @@ class FundDetailScreen extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 16),
-          
+
           Container(
             height: 12,
             decoration: BoxDecoration(
@@ -187,9 +189,9 @@ class FundDetailScreen extends ConsumerWidget {
               ),
             ),
           ),
-          
+
           const SizedBox(height: 16),
-          
+
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -236,9 +238,9 @@ class FundDetailScreen extends ConsumerWidget {
               ),
             ],
           ),
-          
+
           const SizedBox(height: 12),
-          
+
           Text(
             'Target Amount: ${project.targetAmount.toStringAsFixed(0)} Points',
             style: TextStyle(
@@ -331,7 +333,7 @@ class FundDetailScreen extends ConsumerWidget {
 
 class _FundingDialog extends ConsumerStatefulWidget {
   final FundingProject project;
-  
+
   const _FundingDialog({required this.project});
 
   @override
@@ -351,7 +353,7 @@ class _FundingDialogState extends ConsumerState<_FundingDialog> {
   @override
   Widget build(BuildContext context) {
     final pointsAsync = ref.watch(pointsProvider);
-    
+
     return AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       title: Column(
@@ -375,7 +377,7 @@ class _FundingDialogState extends ConsumerState<_FundingDialog> {
               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 16),
-            
+
             pointsAsync.when(
               data: (totalPoints) {
                 return Column(
@@ -404,7 +406,7 @@ class _FundingDialogState extends ConsumerState<_FundingDialog> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    
+
                     const Text(
                       'Points to Fund',
                       style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
@@ -426,7 +428,7 @@ class _FundingDialogState extends ConsumerState<_FundingDialog> {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    
+
                     // Quick selection buttons
                     Wrap(
                       spacing: 8,
@@ -489,53 +491,30 @@ class _FundingDialogState extends ConsumerState<_FundingDialog> {
 
   Future<void> _handleFunding(BuildContext context) async {
     final amountText = _amountController.text.trim();
-    if (amountText.isEmpty) {
-      _showSnackBar(context, '펀딩할 포인트를 입력해주세요', Colors.red);
-      return;
-    }
-
     final amount = int.tryParse(amountText);
-    if (amount == null || amount <= 0) {
-      _showSnackBar(context, '올바른 포인트를 입력해주세요', Colors.red);
-      return;
-    }
+    if (amount == null || amount <= 0) { _showSnackBar(context, '올바른 포인트 입력해줘!', Colors.red); return; }
 
     setState(() => _isLoading = true);
-
     try {
-      final pointsState = ref.read(pointsProvider);
-      final totalPoints = pointsState.value ?? 0;
-      
-      if (amount > totalPoints) {
-        _showSnackBar(context, '보유 포인트가 부족합니다', Colors.red);
-        return;
-      }
+      final totalPoints = ref.read(pointsProvider).value ?? 0;
+      if (amount > totalPoints) { _showSnackBar(context, '포인트 부족해 😭', Colors.red); return; }
 
-      // 포인트로 펀딩하기
-      await EcoBackend.instance.fundWithPoints(widget.project.id, amount);
-      
-      // 포인트 상태를 즉시 업데이트 (UI 빠른 반응용)
+      // 🔗 서버 Functions 호출!
+      await EcoBackend.instance.donate(campaignId: widget.project.id, amount: amount);
+
+      // 포인트·프로젝트 새로고침
       ref.read(pointsProvider.notifier).subtractPoints(amount);
-      
-      // 펀딩 프로젝트 목록 새로고침
-      ref.refresh(fundViewModelProvider);
       await ref.read(fundViewModelProvider.notifier).refresh();
-      
-      // 실제 포인트 새로고침 (정확한 값 확인용)
       await ref.read(pointsProvider.notifier).refresh();
-      
-      if (context.mounted) {
+
+      if (mounted) {
         Navigator.of(context).pop();
-        _showSnackBar(context, '${amount}P로 펀딩이 완료되었습니다!', Colors.green);
+        _showSnackBar(context, '$amount P 기부 완료! 고마워 💚', Colors.green);
       }
     } catch (e) {
-      if (context.mounted) {
-        _showSnackBar(context, '펀딩 처리 중 오류가 발생했습니다: $e', Colors.red);
-      }
+      if (mounted) _showSnackBar(context, '펀딩 실패: $e', Colors.red);
     } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
