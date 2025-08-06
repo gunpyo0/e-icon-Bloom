@@ -54,6 +54,7 @@ class _FundScreenState extends ConsumerState<FundScreen>
     final isLoading      = ref.watch(fundLoadingProvider);
 
     return Scaffold(
+      backgroundColor: Color.fromRGBO(244, 234, 225, 1),
       body: Stack(                                  // ⬅️ ① Stack으로 감싸기
         children: [
           Column(

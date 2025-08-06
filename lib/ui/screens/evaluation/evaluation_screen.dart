@@ -93,7 +93,7 @@ class _EvaluationScreenState extends State<EvaluationScreen> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: Colors.pink[50],
+      color: Color.fromRGBO(244, 234, 225, 1),
       child: _showCreatePost 
           ? _buildCreatePostScreen()
           : _buildMainContent(),
@@ -768,9 +768,84 @@ class PostDetailScreen extends StatefulWidget {
   State<PostDetailScreen> createState() => _PostDetailScreenState();
 }
 
-class _PostDetailScreenState extends State<PostDetailScreen> {
+class _PostDetailScreenState extends State<PostDetailScreen> 
+    with TickerProviderStateMixin {
   int? _selectedScore;
   bool _isVoting = false;
+  
+  // AI 평가 애니메이션 관련
+  List<AnimationController> _animationControllers = [];
+  List<Animation<double>> _fadeAnimations = [];
+  List<Animation<Offset>> _slideAnimations = [];
+  int _currentAISpeaking = -1;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeAnimations();
+    _startAIEvaluationSequence();
+  }
+
+  @override
+  void dispose() {
+    for (var controller in _animationControllers) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  void _initializeAnimations() {
+    // 3개의 AI를 위한 애니메이션 컨트롤러 생성
+    for (int i = 0; i < 3; i++) {
+      final controller = AnimationController(
+        duration: const Duration(milliseconds: 500),
+        vsync: this,
+      );
+      
+      final fadeAnimation = Tween<double>(
+        begin: 0.0,
+        end: 1.0,
+      ).animate(CurvedAnimation(
+        parent: controller,
+        curve: Curves.easeOut,
+      ));
+
+      final slideAnimation = Tween<Offset>(
+        begin: const Offset(-0.3, 0),
+        end: Offset.zero,
+      ).animate(CurvedAnimation(
+        parent: controller,
+        curve: Curves.easeOutBack,
+      ));
+
+      _animationControllers.add(controller);
+      _fadeAnimations.add(fadeAnimation);
+      _slideAnimations.add(slideAnimation);
+    }
+  }
+
+  void _startAIEvaluationSequence() async {
+    // 0.5초 후에 AI 평가 시작
+    await Future.delayed(const Duration(milliseconds: 500));
+    
+    // 각 AI가 순서대로 나타나며 말하기
+    for (int i = 0; i < 3; i++) {
+      if (mounted) {
+        setState(() {
+          _currentAISpeaking = i;
+        });
+        _animationControllers[i].forward();
+        await Future.delayed(const Duration(milliseconds: 800)); // 각 AI마다 0.8초 간격
+      }
+    }
+    
+    // 모든 AI가 말을 마친 후
+    if (mounted) {
+      setState(() {
+        _currentAISpeaking = -1;
+      });
+    }
+  }
 
   Future<String> _getUserDisplayName(String? authorUid, String fallbackName) async {
     if (authorUid == null || authorUid.isEmpty) {
@@ -845,7 +920,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     final String? photoPath = widget.post['photoPath']; // 실제 이미지 경로
 
     return Scaffold(
-      backgroundColor: Colors.pink[50],
+      backgroundColor: Color.fromRGBO(244, 234, 225, 1),
       appBar: AppBar(
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
@@ -957,6 +1032,9 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                             ),
                           ),
                         ],
+                        // AI 평가 섹션 추가
+                        const SizedBox(height: 24),
+                        _buildAIEvaluationSection(context),
                       ],
                     ),
                   ),
@@ -1042,6 +1120,204 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                   ),
                 ),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAIEvaluationSection(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'AI Expert Evaluation',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Colors.green,
+          ),
+        ),
+        const SizedBox(height: 12),
+        _buildAIEvaluators(),
+      ],
+    );
+  }
+
+  Widget _buildAIEvaluators() {
+    final aiData = [
+      {
+        'name': 'Dr. Critical',
+        'icon': Icons.psychology,
+        'color': Colors.red,
+        'evaluation': 'This is mediocre at best. I\'ve seen better environmental efforts from a toddler playing with recyclables. The composition lacks depth, the message is unclear, and frankly, this feels like performative environmentalism.',
+        'personality': 'Cynical & Critical'
+      },
+      {
+        'name': 'Prof. Bright',
+        'icon': Icons.lightbulb,
+        'color': Colors.amber,
+        'evaluation': 'What a wonderful initiative! Every small step towards environmental consciousness matters. The creativity shown here is inspiring and demonstrates genuine care for our planet. Keep up the excellent work!',
+        'personality': 'Positive & Supportive'
+      },
+      {
+        'name': 'EcoGPT',
+        'icon': Icons.eco,
+        'color': Colors.green,
+        'evaluation': 'This post demonstrates environmental awareness with room for improvement. The effort is commendable and shows potential impact. Consider incorporating more specific sustainability metrics for enhanced effectiveness.',
+        'personality': 'Balanced & Analytical'
+      },
+    ];
+
+    return Column(
+      children: aiData.asMap().entries.map((entry) {
+        final index = entry.key;
+        final ai = entry.value;
+        
+        return Padding(
+          padding: EdgeInsets.only(bottom: index < aiData.length - 1 ? 12 : 0),
+          child: AnimatedBuilder(
+            animation: _animationControllers[index],
+            builder: (context, child) {
+              return SlideTransition(
+                position: _slideAnimations[index],
+                child: FadeTransition(
+                  opacity: _fadeAnimations[index],
+                  child: _buildAnimatedAIEvaluator(
+                    ai['name'] as String,
+                    ai['icon'] as IconData,
+                    ai['color'] as Color,
+                    ai['evaluation'] as String,
+                    ai['personality'] as String,
+                    index,
+                  ),
+                ),
+              );
+            },
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildAnimatedAIEvaluator(String name, IconData icon, Color color, String evaluation, String personality, int index) {
+    final isSpeaking = _currentAISpeaking == index;
+    
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isSpeaking ? color.withOpacity(0.2) : color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isSpeaking ? color : color.withOpacity(0.3),
+          width: isSpeaking ? 2 : 1,
+        ),
+        boxShadow: isSpeaking ? [
+          BoxShadow(
+            color: color.withOpacity(0.3),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ] : null,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: color,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(icon, color: Colors.white, size: 16),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          name,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: color,
+                          ),
+                        ),
+                        if (isSpeaking) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            width: 6,
+                            height: 6,
+                            decoration: BoxDecoration(
+                              color: color,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Speaking...',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: color,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    Text(
+                      personality,
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: color.withOpacity(0.8),
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: color,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Text(
+                  'AI',
+                  style: TextStyle(
+                    fontSize: 8,
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: color.withOpacity(0.2)),
+            ),
+            child: AnimatedOpacity(
+              opacity: _animationControllers[index].isCompleted ? 1.0 : 0.3,
+              duration: const Duration(milliseconds: 500),
+              child: Text(
+                evaluation,
+                style: TextStyle(
+                  fontSize: 12,
+                  height: 1.4,
+                  color: _animationControllers[index].isCompleted ? Colors.black : Colors.grey,
+                ),
+              ),
             ),
           ),
         ],

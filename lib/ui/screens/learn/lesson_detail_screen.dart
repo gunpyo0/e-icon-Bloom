@@ -80,7 +80,7 @@ import 'package:flutter/material.dart';
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: Text(
-                  '${_currentStep + 1}/${_lessonSteps.length}',
+                  '${_currentStep >= _lessonSteps.length ? _lessonSteps.length : _currentStep + 1}/${_lessonSteps.length}',
                   style: const TextStyle(
                     color: Colors.green,
                     fontWeight: FontWeight.bold,
@@ -107,6 +107,11 @@ import 'package:flutter/material.dart';
       }
 
       Widget _buildProgressBar() {
+        // 진행률 계산에서 배열 범위 검사
+        final safeCurrentStep = _currentStep >= _lessonSteps.length ? _lessonSteps.length : _currentStep + 1;
+        final progressPercentage = (safeCurrentStep / _lessonSteps.length * 100).toInt();
+        final progressValue = safeCurrentStep / _lessonSteps.length;
+        
         return Container(
           width: double.infinity,
           padding: const EdgeInsets.all(16),
@@ -121,7 +126,7 @@ import 'package:flutter/material.dart';
                     style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
                   ),
                   Text(
-                    '${((_currentStep + 1) / _lessonSteps.length * 100).toInt()}%',
+                    '$progressPercentage%',
                     style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
@@ -132,7 +137,7 @@ import 'package:flutter/material.dart';
               ),
               const SizedBox(height: 8),
               LinearProgressIndicator(
-                value: (_currentStep + 1) / _lessonSteps.length,
+                value: progressValue,
                 backgroundColor: Colors.grey.shade300,
                 valueColor: const AlwaysStoppedAnimation<Color>(Colors.green),
                 minHeight: 6,
@@ -144,6 +149,12 @@ import 'package:flutter/material.dart';
 
       Widget _buildLessonContent() {
         if (_isCompleted) {
+          return _buildCompletionScreen();
+        }
+
+        // 현재 스텝이 배열 범위를 벗어나는 경우 완료 화면 표시
+        if (_currentStep >= _lessonSteps.length) {
+          setState(() => _isCompleted = true);
           return _buildCompletionScreen();
         }
 
