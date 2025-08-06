@@ -135,9 +135,9 @@ class _MainScaffoldState extends State<MainScaffold>
         animationDuration: const Duration(milliseconds: 300),
         destinations: const [
           NavigationDestination(
-            icon: Icon(Icons.info_outline),
-            selectedIcon: Icon(Icons.info),
-            label: 'Info',
+            icon: Icon(Icons.post_add_outlined),
+            selectedIcon: Icon(Icons.post_add),
+            label: 'Post',
           ),
           NavigationDestination(
             icon: Icon(Icons.yard_outlined),

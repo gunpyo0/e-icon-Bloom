@@ -440,7 +440,7 @@ class EcoBackend {
         gardenData['updatedAt'] = FieldValue.serverTimestamp();
 
         print('Updating user document with new points and garden data...');
-        // 포인트 차감과 정원 데이트를 한 번에 업데이트
+        // 포인트 차감과 정원 데이터를 한 번에 업데이트
         transaction.update(userDocRef, {
           'totalPoints': currentPoints - cost,
           'garden': gardenData,
@@ -702,7 +702,7 @@ class EcoBackend {
   }
 
   /*──────────────────────── Posts ────────────────────────────*/
-  /// ① 새 글 생성 → Storage 업로드 경로 반환
+  /// ① 새 글 생성 → Storage 업로드 경로 반환
   Future<({String postId, String storagePath})> createPost({
     required String description,
     File? image,
@@ -718,11 +718,17 @@ class EcoBackend {
     return (postId: postId, storagePath: storagePath);
   }
 
-  /// ② 투표
+  /// ② 특정 포스트 가져오기
+  Future<Map<String, dynamic>> getPostById(String postId) async {
+    final res = await _func.httpsCallable('getPostById').call({'postId': postId});
+    return Map<String, dynamic>.from(res.data);
+  }
+
+  /// ③ 투표
   Future<void> votePost(String postId, int score) =>
       _func.httpsCallable('votePost').call({'postId': postId, 'score': score});
 
-  /// ③ 피드
+  /// ④ 피드
   Future<List<dynamic>> unvotedPosts() async =>
       (await _func.httpsCallable('listUnvotedPosts').call()).data as List<dynamic>;
 

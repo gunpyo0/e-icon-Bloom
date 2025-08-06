@@ -795,8 +795,32 @@ class _PostDetailScreenState extends State<PostDetailScreen>
   }
 
   void _initializeAnimations() {
-    // 3개의 AI를 위한 애니메이션 컨트롤러 생성
-    for (int i = 0; i < 3; i++) {
+    // 기존 컨트롤러들 정리
+    for (var controller in _animationControllers) {
+      controller.dispose();
+    }
+    _animationControllers.clear();
+    _fadeAnimations.clear();
+    _slideAnimations.clear();
+    
+    // evaluations 데이터 확인
+    final evaluations = widget.post['evaluations'];
+    int aiCount = 0;
+    
+    if (evaluations != null && evaluations.isNotEmpty) {
+      // 실제 evaluations 개수 계산
+      aiCount = evaluations.keys.where((key) => 
+        ['balanced', 'critical', 'supportive'].contains(key) && 
+        evaluations[key] != null && 
+        evaluations[key].toString().isNotEmpty
+      ).length;
+    }
+    
+    // 최소 1개, 최대 3개로 제한
+    aiCount = aiCount.clamp(1, 3);
+    
+    // AI 개수에 맞게 애니메이션 컨트롤러 생성
+    for (int i = 0; i < aiCount; i++) {
       final controller = AnimationController(
         duration: const Duration(milliseconds: 500),
         vsync: this,
@@ -828,8 +852,8 @@ class _PostDetailScreenState extends State<PostDetailScreen>
     // 0.5초 후에 AI 평가 시작
     await Future.delayed(const Duration(milliseconds: 500));
     
-    // 각 AI가 순서대로 나타나며 말하기
-    for (int i = 0; i < 3; i++) {
+    // 실제 애니메이션 컨트롤러 개수만큼 반복
+    for (int i = 0; i < _animationControllers.length; i++) {
       if (mounted) {
         setState(() {
           _currentAISpeaking = i;
@@ -930,94 +954,117 @@ class _PostDetailScreenState extends State<PostDetailScreen>
       body: Column(
         children: [
           Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        FutureBuilder<String>(
-                          future: _getUserDisplayName(authorUid, author),
-                          builder: (context, snapshot) {
-                            final displayName = snapshot.data ?? author;
-                            return Row(
-                              children: [
-                                CircleAvatar(
-                                  radius: 20,
-                                  backgroundColor: Colors.green[100],
-                                  child: Text(
-                                    displayName.isNotEmpty ? displayName[0].toUpperCase() : 'U',
-                                    style: TextStyle(
-                                      color: Colors.green[700],
-                                      fontWeight: FontWeight.bold,
+            child: RefreshIndicator(
+              onRefresh: () async {
+                // 새로고침 시 evaluations 데이터 다시 확인
+                try {
+                  // 포스트 데이터를 다시 가져와서 evaluations 업데이트 확인
+                  final updatedPost = await EcoBackend.instance.getPostById(widget.post['id']);
+                  if (mounted) {
+                    setState(() {
+                      // 업데이트된 포스트 데이터로 교체
+                      widget.post.addAll(updatedPost);
+                    });
+                    
+                    // 애니메이션 다시 초기화 및 시작
+                    _initializeAnimations();
+                    _startAIEvaluationSequence();
+                    
+                    // 새로고침 완료 알림
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('새로고침 완료!'),
+                        duration: Duration(seconds: 1),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  debugPrint('Refresh error: $e');
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('새로고침 실패: $e'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                }
+              },
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          FutureBuilder<String>(
+                            future: _getUserDisplayName(authorUid, author),
+                            builder: (context, snapshot) {
+                              final displayName = snapshot.data ?? author;
+                              return Row(
+                                children: [
+                                  CircleAvatar(
+                                    radius: 20,
+                                    backgroundColor: Colors.green[100],
+                                    child: Text(
+                                      displayName.isNotEmpty ? displayName[0].toUpperCase() : 'U',
+                                      style: TextStyle(
+                                        color: Colors.green[700],
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
                                   ),
-                                ),
-                                const SizedBox(width: 12),
-                                Text(
-                                  displayName,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16,
+                                  const SizedBox(width: 12),
+                                  Text(
+                                    displayName,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                    ),
                                   ),
-                                ),
-                              ],
-                            );
-                          },
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          description,
-                          style: const TextStyle(fontSize: 16),
-                        ),
-                        if ((imageUrl != null && imageUrl.isNotEmpty) || (photoPath != null && photoPath.isNotEmpty)) ...[
+                                ],
+                              );
+                            },
+                          ),
                           const SizedBox(height: 16),
-                          GestureDetector(
-                            onTap: () => _showImagePreview(imageUrl ?? photoPath!),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
-                              child: FutureBuilder<String?>(
-                                future: _getImageDownloadUrl(imageUrl ?? photoPath!),
-                                builder: (context, snapshot) {
-                                  if (snapshot.connectionState == ConnectionState.waiting) {
-                                    return Container(
-                                      height: 200,
-                                      color: Colors.grey[200],
-                                      child: const Center(child: CircularProgressIndicator()),
-                                    );
-                                  }
-                                  
-                                  if (snapshot.hasError || !snapshot.hasData || snapshot.data == null) {
-                                    return Container(
-                                      height: 200,
-                                      color: Colors.grey[200],
-                                      child: const Center(
-                                        child: Icon(Icons.broken_image, size: 64),
-                                      ),
-                                    );
-                                  }
-                                  
-                                  return Image.network(
-                                    snapshot.data!,
-                                    width: double.infinity,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (context, error, stackTrace) {
+                          Text(
+                            description,
+                            style: const TextStyle(fontSize: 16),
+                          ),
+                          if ((imageUrl != null && imageUrl.isNotEmpty) || (photoPath != null && photoPath.isNotEmpty)) ...[
+                            const SizedBox(height: 16),
+                            GestureDetector(
+                              onTap: () => _showImagePreview(imageUrl ?? photoPath!),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: FutureBuilder<String?>(
+                                  future: _getImageDownloadUrl(imageUrl ?? photoPath!),
+                                  builder: (context, snapshot) {
+                                    if (snapshot.connectionState == ConnectionState.waiting) {
+                                      return Container(
+                                        height: 200,
+                                        color: Colors.grey[200],
+                                        child: const Center(child: CircularProgressIndicator()),
+                                      );
+                                    }
+                                    
+                                    if (snapshot.hasError || !snapshot.hasData || snapshot.data == null) {
                                       return Container(
                                         height: 200,
                                         color: Colors.grey[200],
@@ -1025,20 +1072,35 @@ class _PostDetailScreenState extends State<PostDetailScreen>
                                           child: Icon(Icons.broken_image, size: 64),
                                         ),
                                       );
-                                    },
-                                  );
-                                },
+                                    }
+                                    
+                                    return Image.network(
+                                      snapshot.data!,
+                                      width: double.infinity,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (context, error, stackTrace) {
+                                        return Container(
+                                          height: 200,
+                                          color: Colors.grey[200],
+                                          child: const Center(
+                                            child: Icon(Icons.broken_image, size: 64),
+                                          ),
+                                        );
+                                      },
+                                    );
+                                  },
+                                ),
                               ),
                             ),
-                          ),
+                          ],
+                          // AI 평가 섹션 추가
+                          const SizedBox(height: 24),
+                          _buildAIEvaluationSection(context),
                         ],
-                        // AI 평가 섹션 추가
-                        const SizedBox(height: 24),
-                        _buildAIEvaluationSection(context),
-                      ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -1128,6 +1190,25 @@ class _PostDetailScreenState extends State<PostDetailScreen>
   }
 
   Widget _buildAIEvaluationSection(BuildContext context) {
+    // evaluations 데이터 확인
+    final evaluations = widget.post['evaluations'];
+    
+    // 디버깅 로그 추가
+    print('=== EVALUATIONS DEBUG ===');
+    print('Post ID: ${widget.post['id']}');
+    print('Evaluations: $evaluations');
+    if (evaluations != null) {
+      evaluations.forEach((key, value) {
+        print('$key: $value');
+      });
+    }
+    print('========================');
+    
+    // evaluations가 없거나 null이면 섹션을 숨김
+    if (evaluations == null || evaluations.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1146,37 +1227,63 @@ class _PostDetailScreenState extends State<PostDetailScreen>
   }
 
   Widget _buildAIEvaluators() {
-    final aiData = [
-      {
-        'name': 'Dr. Critical',
-        'icon': Icons.psychology,
-        'color': Colors.red,
-        'evaluation': 'This is mediocre at best. I\'ve seen better environmental efforts from a toddler playing with recyclables. The composition lacks depth, the message is unclear, and frankly, this feels like performative environmentalism.',
-        'personality': 'Cynical & Critical'
-      },
-      {
-        'name': 'Prof. Bright',
-        'icon': Icons.lightbulb,
-        'color': Colors.amber,
-        'evaluation': 'What a wonderful initiative! Every small step towards environmental consciousness matters. The creativity shown here is inspiring and demonstrates genuine care for our planet. Keep up the excellent work!',
-        'personality': 'Positive & Supportive'
-      },
-      {
+    final evaluations = widget.post['evaluations'];
+    
+    // evaluations가 없으면 빈 컨테이너 반환
+    if (evaluations == null || evaluations.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    
+    // AI 평가자 정보 정의
+    final aiConfigs = {
+      'balanced': {
         'name': 'EcoGPT',
         'icon': Icons.eco,
         'color': Colors.green,
-        'evaluation': 'This post demonstrates environmental awareness with room for improvement. The effort is commendable and shows potential impact. Consider incorporating more specific sustainability metrics for enhanced effectiveness.',
         'personality': 'Balanced & Analytical'
       },
-    ];
+      'critical': {
+        'name': 'Dr. Critical',
+        'icon': Icons.psychology,
+        'color': Colors.red,
+        'personality': 'Cynical & Critical'
+      },
+      'supportive': {
+        'name': 'Prof. Bright',
+        'icon': Icons.lightbulb,
+        'color': Colors.amber,
+        'personality': 'Positive & Supportive'
+      },
+    };
+    
+    // evaluations에서 실제 AI 평가 텍스트 추출
+    final List<Map<String, dynamic>> aiEvaluations = [];
+    
+    evaluations.forEach((key, value) {
+      if (aiConfigs.containsKey(key) && value != null && value.toString().isNotEmpty) {
+        aiEvaluations.add({
+          'type': key,
+          'evaluation': value.toString(),
+          'name': aiConfigs[key]!['name'],
+          'icon': aiConfigs[key]!['icon'],
+          'color': aiConfigs[key]!['color'],
+          'personality': aiConfigs[key]!['personality'],
+        });
+      }
+    });
+    
+    // 평가가 없으면 빈 컨테이너 반환
+    if (aiEvaluations.isEmpty) {
+      return const SizedBox.shrink();
+    }
 
     return Column(
-      children: aiData.asMap().entries.map((entry) {
+      children: aiEvaluations.asMap().entries.map((entry) {
         final index = entry.key;
         final ai = entry.value;
         
         return Padding(
-          padding: EdgeInsets.only(bottom: index < aiData.length - 1 ? 12 : 0),
+          padding: EdgeInsets.only(bottom: index < aiEvaluations.length - 1 ? 12 : 0),
           child: AnimatedBuilder(
             animation: _animationControllers[index],
             builder: (context, child) {

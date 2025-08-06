@@ -5,30 +5,12 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="11443f8b-fe0c-4478-84dc-918e19aa887d" name="Changes" comment="TEST TEST">
-      <change afterPath="$PROJECT_DIR$/assets/fonts/aggroL.ttf" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/assets/fonts/aggroM.ttf" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/assets/fonts/agrroB.ttf" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/libraries/Dart_Packages.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/libraries/Dart_Packages.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/libraries/Flutter_Plugins.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/libraries/Flutter_Plugins.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/vcs.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.metadata" beforeDir="false" afterPath="$PROJECT_DIR$/.metadata" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/android/app/build.gradle.kts" beforeDir="false" afterPath="$PROJECT_DIR$/android/app/build.gradle.kts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/android/app/google-services.json" beforeDir="false" afterPath="$PROJECT_DIR$/android/app/google-services.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/android/build.gradle.kts" beforeDir="false" afterPath="$PROJECT_DIR$/android/build.gradle.kts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/android/gradle.properties" beforeDir="false" afterPath="$PROJECT_DIR$/android/gradle.properties" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/android/gradle/wrapper/gradle-wrapper.properties" beforeDir="false" afterPath="$PROJECT_DIR$/android/gradle/wrapper/gradle-wrapper.properties" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/android/settings.gradle.kts" beforeDir="false" afterPath="$PROJECT_DIR$/android/settings.gradle.kts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/bloom.iml" beforeDir="false" afterPath="$PROJECT_DIR$/bloom.iml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/firebase.json" beforeDir="false" afterPath="$PROJECT_DIR$/firebase.json" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/lib/core/app_router.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/core/app_router.dart" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/lib/data/services/eco_backend.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/data/services/eco_backend.dart" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/lib/ui/screens/evaluation/evaluation_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/ui/screens/evaluation/evaluation_screen.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/ui/screens/fund/fund_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/ui/screens/fund/fund_screen.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/ui/screens/learn/learn_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/ui/screens/learn/learn_screen.dart" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/lib/ui/screens/learn/lesson_detail_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/ui/screens/learn/lesson_detail_screen.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/ui/screens/main/main_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/ui/screens/main/main_screen.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pubspec.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/pubspec.yaml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/ui/screens/learn/quiz_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/ui/screens/learn/quiz_screen.dart" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -99,7 +81,6 @@
     "RunOnceActivity.readMode.enableVisualFormatting": "true",
     "cf.first.check.clang-format": "false",
     "cidr.known.project.marker": "true",
-    "dart.analysis.tool.window.visible": "false",
     "git-widget-placeholder": "catea2",
     "io.flutter.reload.alreadyRun": "true",
     "last_opened_file_path": "C:/Users/USER/StudioProjects/e-icon-Bloomd/unity",
