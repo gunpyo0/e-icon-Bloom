@@ -2,6 +2,7 @@ import 'package:bloom/ui/screens/fund/fund_create_screen.dart';
 import 'package:bloom/ui/screens/fund/fund_screen.dart';
 import 'package:bloom/ui/screens/fund/fund_detail_screen.dart';
 import 'package:bloom/ui/screens/auth/login_screen.dart';
+import 'package:bloom/ui/screens/garden/unity.dart';
 import 'package:bloom/ui/screens/profile/profile_screen.dart';
 import 'package:bloom/ui/screens/garden/garden_screen.dart';
 import 'package:bloom/ui/screens/learn/learn_screen.dart';
@@ -73,7 +74,7 @@ class _MainScaffoldState extends State<MainScaffold>
 
   final pages = [
     const EvaluationScreen(),
-    const GardenScreen(),
+    const UnityFullScreen(),
     const MainScreen(),
     const LearnScreen(),
     const FundScreen(),
@@ -121,6 +122,9 @@ class _MainScaffoldState extends State<MainScaffold>
           Expanded(
             child: PageView(
               controller: _pageController,
+              physics: _index == 1
+                  ? const NeverScrollableScrollPhysics()
+                  : const PageScrollPhysics(),
               onPageChanged: (index) {
                 setState(() => _index = index);
               },
@@ -142,7 +146,7 @@ class _MainScaffoldState extends State<MainScaffold>
           NavigationDestination(
             icon: Icon(Icons.yard_outlined),
             selectedIcon: Icon(Icons.yard),
-            label: 'Garden',
+            label: 'd',
           ),
           NavigationDestination(
             icon: Icon(Icons.home_outlined),

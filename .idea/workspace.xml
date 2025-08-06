@@ -5,12 +5,21 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="11443f8b-fe0c-4478-84dc-918e19aa887d" name="Changes" comment="TEST TEST">
+<<<<<<< Updated upstream
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/lib/core/app_router.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/core/app_router.dart" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/lib/data/services/eco_backend.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/data/services/eco_backend.dart" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/lib/ui/screens/evaluation/evaluation_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/ui/screens/evaluation/evaluation_screen.dart" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/lib/ui/screens/learn/lesson_detail_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/ui/screens/learn/lesson_detail_screen.dart" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/lib/ui/screens/learn/quiz_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/ui/screens/learn/quiz_screen.dart" afterDir="false" />
+=======
+      <change afterPath="$PROJECT_DIR$/lib/ui/screens/garden/unity.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/android/app/google-services.json" beforeDir="false" afterPath="$PROJECT_DIR$/android/app/google-services.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/core/app_router.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/core/app_router.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/ui/screens/garden/garden_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/ui/screens/garden/garden_screen.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/ui/screens/main/main_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/ui/screens/main/main_screen.dart" afterDir="false" />
+>>>>>>> Stashed changes
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -81,7 +90,12 @@
     "RunOnceActivity.readMode.enableVisualFormatting": "true",
     "cf.first.check.clang-format": "false",
     "cidr.known.project.marker": "true",
+<<<<<<< Updated upstream
     "git-widget-placeholder": "catea2",
+=======
+    "dart.analysis.tool.window.visible": "false",
+    "git-widget-placeholder": "main",
+>>>>>>> Stashed changes
     "io.flutter.reload.alreadyRun": "true",
     "last_opened_file_path": "C:/Users/USER/StudioProjects/e-icon-Bloomd/unity",
     "show.migrate.to.gradle.popup": "false"
@@ -92,8 +106,12 @@
       <recent name="C:\Users\USER\StudioProjects\e-icon-Bloomd\unity" />
     </key>
     <key name="MoveFile.RECENT_KEYS">
+<<<<<<< Updated upstream
       <recent name="C:\Users\User\Documents\GitHub\e-icon-Bloom\assets\fonts" />
       <recent name="C:\Users\User\Documents\GitHub\e-icon-Bloom\android\app" />
+=======
+      <recent name="C:\Users\USER\StudioProjects\e-icon-Bloomd\android\app" />
+>>>>>>> Stashed changes
     </key>
   </component>
   <component name="TaskManager">
