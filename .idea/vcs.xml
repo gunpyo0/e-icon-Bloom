@@ -2,7 +2,5 @@
 <project version="4">
   <component name="VcsDirectoryMappings">
     <mapping directory="" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/unity/bloom-game-2/bloom-game" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/unity/bloom-game-2/catea-bloom-game" vcs="Git" />
   </component>
 </project>

@@ -80,3 +80,15 @@ const Map<String, IconData> IconsMap = {
   'chart'   : Icons.analytics,
   'energy'  : Icons.energy_savings_leaf,
 };
+
+class Stepadder {
+  final String lessonId;
+  final int    step;           // 0-based
+
+  Stepadder({required this.lessonId, required this.step});
+
+  Map<String, dynamic> toJson() => {
+    'lessonId': lessonId,
+    'step'    : step,
+  };
+}

@@ -196,13 +196,7 @@ class ProfileScreen extends ConsumerWidget {
                         error: (_, __) => _buildStatRow('Total Points', '${profile['totalPoints'] ?? 0} P'),
                       );
                     },
-                  ),
-                  const SizedBox(height: 12),
-                  _buildStatRow('Education Points', '${profile['eduPoints'] ?? 0} P'),
-                  const SizedBox(height: 12),
-                  _buildStatRow('Action Points', '${profile['jobPoints'] ?? 0} P'),
-                  const SizedBox(height: 12),
-                  _buildStatRow('Completed Lessons', '${profile['completedLessons'] ?? 0}'),
+                  )
                 ],
               ),
               loading: () => const Center(child: CircularProgressIndicator()),

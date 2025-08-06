@@ -8,11 +8,13 @@ import 'package:bloom/providers/points_provider.dart';
 class QuizScreen extends ConsumerStatefulWidget {
   final String lessonId;
   final String lessonTitle;
+  final bool isReviewMode; // 복습 모드 플래그 추가
 
   const QuizScreen({
     super.key,
     required this.lessonId,
     required this.lessonTitle,
+    this.isReviewMode = false, // 기본값은 false
   });
 
   @override
@@ -37,14 +39,17 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
 
   Future<void> _loadQuizzes() async {
     try {
-      final completed = await EcoBackend.instance
-          .isLessonCompleted(widget.lessonId);
-      if (completed) {
-        setState(() {
-          isLessonCompleted = true;
-          isLoading = false;
-        });
-        return;
+      // 복습 모드가 아닌 경우에만 완료 상태 확인
+      if (!widget.isReviewMode) {
+        final completed = await EcoBackend.instance
+            .isLessonCompleted(widget.lessonId);
+        if (completed) {
+          setState(() {
+            isLessonCompleted = true;
+            isLoading = false;
+          });
+          return;
+        }
       }
 
       final quizList = await EcoBackend.instance
@@ -68,23 +73,36 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
     });
 
     try {
-      final result = await EcoBackend.instance.submitQuizAnswer(
-        lessonId: widget.lessonId,
-        quizId: quizzes[currentQuizIndex].id,
-        answerIndex: selectedAnswer!,
-      );
+      Map<String, dynamic> result;
+      
+      if (widget.isReviewMode) {
+        // 복습 모드에서는 서버 통신 없이 답변만 표시
+        final currentQuiz = quizzes[currentQuizIndex];
+        final isCorrect = selectedAnswer == currentQuiz.correctAnswerIndex;
+        
+        result = {
+          'isCorrect': isCorrect,
+          'awarded': 0, // 복습 모드에서는 포인트 지급 안함
+          'alreadyAnswered': false,
+        };
+      } else {
+        // 일반 모드에서는 서버 통신
+        result = await EcoBackend.instance.answerQuiz(
+          lessonId : widget.lessonId,
+          quizId   : quizzes[currentQuizIndex].id,
+          answerIdx: selectedAnswer!,
+        );
+      }
 
-      // Save result
       quizResults.add({
-        'quizId': quizzes[currentQuizIndex].id,
+        'quizId'           : quizzes[currentQuizIndex].id,
         'selectedAnswerIndex': selectedAnswer!,
-        'isCorrect': result['isCorrect'],
-        'pointsEarned': result['pointsEarned'],
+        'isCorrect'        : result['isCorrect'],
+        'pointsEarned'     : result['awarded'],
       });
 
-      // Update points immediately
-      if (result['isCorrect'] == true && result['pointsEarned'] > 0) {
-        ref.read(pointsProvider.notifier).addPoints(result['pointsEarned']);
+      if (result['awarded'] is int && result['awarded'] > 0) {
+        ref.read(pointsProvider.notifier).refresh();
       }
 
       setState(() {
@@ -142,42 +160,53 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Column(
           children: [
-            Icon(Icons.celebration, color: Colors.green, size: 48),
+            Icon(
+              widget.isReviewMode ? Icons.refresh : Icons.celebration, 
+              color: widget.isReviewMode ? Colors.blue : Colors.green, 
+              size: 48
+            ),
             SizedBox(height: 8),
-            Text('Lesson Completed!', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+            Text(
+              widget.isReviewMode ? '복습 완료!' : 'Lesson Completed!', 
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)
+            ),
           ],
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              'You have completed ${widget.lessonTitle}!',
+              widget.isReviewMode 
+                ? '${widget.lessonTitle} 복습을 완료했습니다!'
+                : 'You have completed ${widget.lessonTitle}!',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 16),
             ),
-            SizedBox(height: 16),
-            Container(
-              padding: EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.green.shade50,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.monetization_on, color: Colors.green),
-                  SizedBox(width: 8),
-                  Text(
-                    'Total ${totalPoints}P Earned!',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.green,
+            if (!widget.isReviewMode) ...[
+              SizedBox(height: 16),
+              Container(
+                padding: EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.green.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.monetization_on, color: Colors.green),
+                    SizedBox(width: 8),
+                    Text(
+                      'Total ${totalPoints}P Earned!',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.green,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
+            ],
           ],
         ),
         actions: [
@@ -187,13 +216,13 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
               Navigator.of(context).pop(); // Close quiz screen
             },
             style: TextButton.styleFrom(
-              backgroundColor: Colors.green,
+              backgroundColor: widget.isReviewMode ? Colors.blue : Colors.green,
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
             child: Padding(
               padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Text('Complete'),
+              child: Text(widget.isReviewMode ? '완료' : 'Complete'),
             ),
           ),
         ],
@@ -228,27 +257,42 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
           icon: Icon(Icons.arrow_back, color: Colors.black),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: Text(
-          widget.lessonTitle,
-          style: TextStyle(
-            color: Colors.black,
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-          ),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              widget.isReviewMode ? '${widget.lessonTitle} (복습)' : widget.lessonTitle,
+              style: TextStyle(
+                color: Colors.black,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            if (widget.isReviewMode)
+              Text(
+                '이미 완료된 퀴즈입니다',
+                style: TextStyle(
+                  color: Colors.blue.shade600,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+          ],
         ),
         actions: [
-          if (!isLessonCompleted && quizzes.isNotEmpty)
+          if (widget.isReviewMode)
             Container(
-              margin: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              margin: const EdgeInsets.only(right: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: Colors.green.shade100,
-                borderRadius: BorderRadius.circular(16),
+                color: Colors.blue.shade100,
+                borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
-                '${currentQuizIndex + 1}/${quizzes.length}',
+                '복습',
                 style: TextStyle(
-                  color: Colors.green.shade700,
+                  color: Colors.blue.shade700,
+                  fontSize: 12,
                   fontWeight: FontWeight.bold,
                 ),
               ),

@@ -1,4 +1,5 @@
     import 'package:bloom/data/models/lesson_models.dart';
+import 'package:bloom/providers/points_provider.dart';
 import 'package:flutter/material.dart';
     import 'package:flutter_riverpod/flutter_riverpod.dart';
     import 'package:bloom/data/services/eco_backend.dart';
@@ -7,11 +8,14 @@ import 'package:flutter/material.dart';
     class LessonDetailScreen extends ConsumerStatefulWidget {
       final int lessonId;
       final String lessonTitle;
+      final int initialStep;
 
       const LessonDetailScreen({
         super.key,
         required this.lessonId,
         required this.lessonTitle,
+        this.initialStep = 0,
+
       });
 
       @override
@@ -21,24 +25,45 @@ import 'package:flutter/material.dart';
     class _LessonDetailScreenState extends ConsumerState<LessonDetailScreen> {
       int _currentStep = 0;
       bool _isCompleted = false;
-      bool _isLoadingSteps  = true;
+      bool _isLoadingSteps = true;
+      bool _isReviewMode = false; // 복습 모드 플래그 추가
       late List<LessonStep> _lessonSteps;
 
       @override
       void initState() {
         super.initState();
-          _loadSteps();
+        _currentStep = widget.initialStep;
+        _loadSteps();
+        _checkLessonStatus(); // 레슨 상태 확인 추가
+      }
+
+      Future<void> _checkLessonStatus() async {
+        try {
+          // 레슨 완료 상태 확인
+          final isCompleted = await EcoBackend.instance.isLessonCompleted(widget.lessonId.toString());
+          
+          if (mounted) {
+            setState(() {
+              _isReviewMode = isCompleted;
+              if (isCompleted) {
+                _isCompleted = true;
+              }
+            });
+          }
+        } catch (e) {
+          debugPrint('Lesson status check error: $e');
+        }
       }
 
       Future<void> _loadSteps() async {
         try {
-            _lessonSteps = await EcoBackend.instance
-                .fetchLessonSteps(widget.lessonId.toString());
-          } catch (e) {
-            debugPrint('Step load error: $e');
-          } finally {
-            if (mounted) setState(() => _isLoadingSteps = false);
-          }
+          _lessonSteps = await EcoBackend.instance
+              .fetchLessonSteps(widget.lessonId.toString());
+        } catch (e) {
+          debugPrint('Step load error: $e');
+        } finally {
+          if (mounted) setState(() => _isLoadingSteps = false);
+        }
       }
 
       @override
@@ -75,7 +100,7 @@ import 'package:flutter/material.dart';
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: Text(
-                  '${_currentStep + 1}/${_lessonSteps.length}',
+                  '${_currentStep >= _lessonSteps.length ? _lessonSteps.length : _currentStep + 1}/${_lessonSteps.length}',
                   style: const TextStyle(
                     color: Colors.green,
                     fontWeight: FontWeight.bold,
@@ -102,6 +127,11 @@ import 'package:flutter/material.dart';
       }
 
       Widget _buildProgressBar() {
+        // 진행률 계산에서 배열 범위 검사
+        final safeCurrentStep = _currentStep >= _lessonSteps.length ? _lessonSteps.length : _currentStep + 1;
+        final progressPercentage = (safeCurrentStep / _lessonSteps.length * 100).toInt();
+        final progressValue = safeCurrentStep / _lessonSteps.length;
+        
         return Container(
           width: double.infinity,
           padding: const EdgeInsets.all(16),
@@ -116,7 +146,7 @@ import 'package:flutter/material.dart';
                     style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
                   ),
                   Text(
-                    '${((_currentStep + 1) / _lessonSteps.length * 100).toInt()}%',
+                    '$progressPercentage%',
                     style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
@@ -127,7 +157,7 @@ import 'package:flutter/material.dart';
               ),
               const SizedBox(height: 8),
               LinearProgressIndicator(
-                value: (_currentStep + 1) / _lessonSteps.length,
+                value: progressValue,
                 backgroundColor: Colors.grey.shade300,
                 valueColor: const AlwaysStoppedAnimation<Color>(Colors.green),
                 minHeight: 6,
@@ -139,6 +169,12 @@ import 'package:flutter/material.dart';
 
       Widget _buildLessonContent() {
         if (_isCompleted) {
+          return _buildCompletionScreen();
+        }
+
+        // 현재 스텝이 배열 범위를 벗어나는 경우 완료 화면 표시
+        if (_currentStep >= _lessonSteps.length) {
+          setState(() => _isCompleted = true);
           return _buildCompletionScreen();
         }
 
@@ -386,85 +422,172 @@ import 'package:flutter/material.dart';
         return Container(
           padding: const EdgeInsets.all(20),
           color: Colors.white,
-          child: Row(
+          child: Column(
             children: [
-              if (_currentStep > 0)
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () {
-                      setState(() {
-                        _currentStep--;
-                      });
-                    },
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      side: const BorderSide(color: Colors.green),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+              // 복습 모드 표시
+              if (_isReviewMode)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  margin: const EdgeInsets.only(bottom: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.blue.shade200),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.refresh, color: Colors.blue.shade600, size: 16),
+                      const SizedBox(width: 8),
+                      Text(
+                        '복습 모드',
+                        style: TextStyle(
+                          color: Colors.blue.shade600,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
                       ),
-                    ),
-                    child: const Text(
-                      'Previous',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.green,
-                      ),
-                    ),
+                    ],
                   ),
                 ),
+              Row(
+                children: [
+                  if (_currentStep > 0)
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () {
+                          setState(() {
+                            _currentStep--;
+                          });
+                        },
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          side: const BorderSide(color: Colors.green),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: const Text(
+                          'Previous',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.green,
+                          ),
+                        ),
+                      ),
+                    ),
 
-              if (_currentStep > 0) const SizedBox(width: 12),
+                  if (_currentStep > 0) const SizedBox(width: 12),
 
-              Expanded(
-                flex: 2,
-                child: ElevatedButton(
-                  onPressed: _isCompleted ? _completeLesson : _nextStep,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
+                  Expanded(
+                    flex: 2,
+                    child: ElevatedButton(
+                      onPressed: _isCompleted ? _completeLesson : _nextStep,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _isReviewMode ? Colors.blue : Colors.green,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: Text(
+                        _isCompleted
+                          ? (_isReviewMode ? '퀴즈 다시 보기' : 'Take Quiz')
+                          : _currentStep == _lessonSteps.length - 1
+                            ? (_isReviewMode ? '복습 완료' : 'Finish Learning')
+                            : (_isReviewMode ? '다음 단계' : 'Next'),
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
                   ),
-                  child: Text(
-                    _isCompleted
-                      ? 'Take Quiz'
-                      : _currentStep == _lessonSteps.length - 1
-                        ? 'Finish Learning'
-                        : 'Next',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
+                ],
               ),
             ],
           ),
         );
       }
 
-      void _nextStep() {
-        if (_currentStep < _lessonSteps.length - 1) {
-          setState(() {
-            _currentStep++;
-          });
-        } else {
-          setState(() {
-            _isCompleted = true;
-          });
+      void _nextStep() async {
+        // 복습 모드에서는 서버 통신 없이 단계만 진행
+        if (_isReviewMode) {
+          if (_currentStep < _lessonSteps.length - 1) {
+            setState(() => _currentStep++);
+          } else {
+            setState(() => _isCompleted = true);
+          }
+          return;
+        }
+
+        try {
+          final stepInfo = await EcoBackend.instance.nextStep(
+            Stepadder(lessonId: widget.lessonId.toString(), step: _currentStep),
+          );
+
+          if (!mounted) return;
+          
+          if (stepInfo['addPoint'] > 0) {
+            // 즉시 포인트 반영
+            ref.read(pointsProvider.notifier).refresh();
+          }
+
+          if (stepInfo['isLessonDone'] == true) {
+            setState(() => _isCompleted = true);
+          } else {
+            setState(() => _currentStep++);
+          }
+        } catch (e) {
+          // 오류 처리 개선
+          debugPrint('Next step error: $e');
+          
+          // 이미 완료된 단계인 경우 복습 모드로 전환
+          if (e.toString().contains('이전 단계') || e.toString().contains('failed-precondition')) {
+            setState(() {
+              _isReviewMode = true;
+            });
+            
+            // 사용자에게 알림
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('이미 완료된 레슨입니다. 복습 모드로 전환됩니다.'),
+                  duration: Duration(seconds: 2),
+                ),
+              );
+            }
+            
+            // 다음 단계로 진행
+            if (_currentStep < _lessonSteps.length - 1) {
+              setState(() => _currentStep++);
+            } else {
+              setState(() => _isCompleted = true);
+            }
+          } else {
+            // 다른 오류의 경우 사용자에게 알림
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('오류가 발생했습니다: $e'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            }
+          }
         }
       }
 
       void _completeLesson() async {
-        // 퀴즈 화면으로 이동
+        // 복습 모드에서는 퀴즈 화면으로 이동하되, 이미 완료된 퀴즈임을 표시
         Navigator.of(context).push(
           MaterialPageRoute(
             builder: (context) => QuizScreen(
               lessonId: widget.lessonId.toString(),
               lessonTitle: widget.lessonTitle,
+              isReviewMode: _isReviewMode, // 복습 모드 플래그 전달
             ),
           ),
         );

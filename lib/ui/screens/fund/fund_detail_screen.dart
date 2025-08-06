@@ -145,6 +145,7 @@ class FundDetailScreen extends ConsumerWidget {
 
   Widget _buildProjectInfo(BuildContext context, FundingProject project) {
     final progressPercentage = (project.currentAmount / project.targetAmount * 100).clamp(0, 100);
+    final progressPercentageReal = (project.currentAmount / project.targetAmount * 100);
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -227,7 +228,7 @@ class FundDetailScreen extends ConsumerWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '${progressPercentage.toStringAsFixed(0)}%',
+                    '${progressPercentageReal.toStringAsFixed(0)}%',
                     style: const TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,

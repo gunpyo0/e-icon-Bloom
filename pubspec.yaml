@@ -46,10 +46,6 @@ dependencies:
   google_sign_in: ^6.2.1  
   intl: ^0.20.2
   flame: ^1.21.0
-  flutter_unity_widget:
-    git:
-      url: https://github.com/juicycleff/flutter-unity-view-widget.git
-      ref: experimental/unity_6000 # branch name
 
 dev_dependencies:
   flutter_lints: ^5.0.0
@@ -82,7 +78,12 @@ flutter:
   # "family" key with the font family name, and a "fonts" key with a
   # list giving the asset and other descriptors for the font. For
   # example:
-  # fonts:
+  fonts:
+    - family: aggro
+      fonts:
+        - asset: assets/fonts/agrroB.ttf
+
+    # fonts:
   #   - family: Schyler
   #     fonts:
   #       - asset: fonts/Schyler-Regular.ttf

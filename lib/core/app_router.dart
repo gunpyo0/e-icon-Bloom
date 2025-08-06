@@ -114,6 +114,10 @@ class _MainScaffoldState extends State<MainScaffold>
       body: Column(
         children: [
           _buildHeader(context),
+          Container(
+            height: 10,
+            color: Color.fromRGBO(171, 101, 119, 1),
+          ),
           Expanded(
             child: PageView(
               controller: _pageController,
@@ -131,9 +135,9 @@ class _MainScaffoldState extends State<MainScaffold>
         animationDuration: const Duration(milliseconds: 300),
         destinations: const [
           NavigationDestination(
-            icon: Icon(Icons.info_outline),
-            selectedIcon: Icon(Icons.info),
-            label: 'Info',
+            icon: Icon(Icons.post_add_outlined),
+            selectedIcon: Icon(Icons.post_add),
+            label: 'Post',
           ),
           NavigationDestination(
             icon: Icon(Icons.yard_outlined),
@@ -164,7 +168,7 @@ class _MainScaffoldState extends State<MainScaffold>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Color.fromRGBO(54, 61, 56, 1),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
@@ -194,9 +198,10 @@ class _MainScaffoldState extends State<MainScaffold>
               const Text(
                 'BLOOM',
                 style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black,
+                  fontSize: 24,
+                  fontFamily: "aggro",
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
                 ),
               ),
             ],

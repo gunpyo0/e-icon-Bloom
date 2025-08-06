@@ -51,31 +51,49 @@ class _FundScreenState extends ConsumerState<FundScreen>
   @override
   Widget build(BuildContext context) {
     final selectedFilter = ref.watch(selectedFilterProvider);
+    final isLoading      = ref.watch(fundLoadingProvider);
 
     return Scaffold(
-      body: Column(
+      backgroundColor: Color.fromRGBO(244, 234, 225, 1),
+      body: Stack(                                  // ⬅️ ① Stack으로 감싸기
         children: [
-          _buildFilterButtons(context, ref),
-          Expanded(
-            child: selectedFilter == FilterType.sort
-                ? _buildSortedFundingList(
-                context, ref.watch(sortedFundingProjectsProvider))
-                : selectedFilter == FilterType.search
-                ? _buildSearchResults(
-              context,
-              ref,
-              ref.watch(filteredFundingProjectsProvider),
-            )
-                : _buildFilteredFundingList(
-                context, ref.watch(filteredFundingProjectsProvider)),
+          Column(
+            children: [
+              _buildFilterButtons(context, ref),
+              Expanded(
+                child: selectedFilter == FilterType.sort
+                    ? _buildSortedFundingList(
+                    context, ref.watch(sortedFundingProjectsProvider))
+                    : selectedFilter == FilterType.search
+                    ? _buildSearchResults(
+                  context,
+                  ref,
+                  ref.watch(filteredFundingProjectsProvider),
+                )
+                    : _buildFilteredFundingList(
+                    context, ref.watch(filteredFundingProjectsProvider)),
+              ),
+            ],
           ),
+          if (isLoading)                            // ⬅️ ② 로딩 오버레이
+            Positioned.fill(
+              child: Container(
+                color: Colors.white.withOpacity(0.75),
+                child: const Center(
+                  child: SizedBox(
+                    height: 60,
+                    width: 60,
+                    child: CircularProgressIndicator(strokeWidth: 6),
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
-
-      /*── FAB(권한 UID만 활성) ─*/
       floatingActionButton: FloatingActionButton(
-        backgroundColor:
-        _isOwner ? Colors.green : Colors.grey.shade400.withOpacity(.6),
+        backgroundColor: _isOwner
+            ? Colors.green
+            : Colors.grey.shade400.withOpacity(.6),
         onPressed: _isOwner ? () => context.push('/fund/create') : null,
         child: const Icon(Icons.add),
       ),
@@ -801,6 +819,7 @@ class _FundScreenState extends ConsumerState<FundScreen>
 
   Widget _buildFundingCard(BuildContext context, FundingProject project) {
     final progressPercentage = (project.currentAmount / project.targetAmount * 100).clamp(0, 100);
+    final progressPercentageReal = (project.currentAmount / project.targetAmount * 100);
     
     return GestureDetector(
       onTap: () {
@@ -969,7 +988,7 @@ class _FundScreenState extends ConsumerState<FundScreen>
                         ),
                       ),
                       Text(
-                        '${progressPercentage.toStringAsFixed(0)}%',
+                        '${progressPercentageReal.toStringAsFixed(0)}%',
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w500,
