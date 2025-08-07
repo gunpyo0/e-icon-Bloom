@@ -4,7 +4,6 @@ import 'package:bloom/ui/screens/fund/fund_detail_screen.dart';
 import 'package:bloom/ui/screens/auth/login_screen.dart';
 import 'package:bloom/ui/screens/garden/unity.dart';
 import 'package:bloom/ui/screens/profile/profile_screen.dart';
-import 'package:bloom/ui/screens/garden/garden_screen.dart';
 import 'package:bloom/ui/screens/learn/learn_screen.dart';
 import 'package:bloom/ui/screens/evaluation/evaluation_screen.dart';
 import 'package:bloom/ui/screens/eco_debug_page.dart';

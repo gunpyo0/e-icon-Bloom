@@ -58,17 +58,6 @@
           }
         },
         {
-<<<<<<< Updated upstream
-=======
-          "client_id": "687845921833-lnjfm5duo1ln2qm8qlb0n38t28dq1j92.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "com.example.bloom",
-            "certificate_hash": "6bc4d5d2e51d99d3ccf2d7b008b0ea79a5c8e1e0"
-          }
-        },
-        {
->>>>>>> Stashed changes
           "client_id": "687845921833-pnt675aif5cebuc01gdm8ip7d3hvk8m6.apps.googleusercontent.com",
           "client_type": 3
         }

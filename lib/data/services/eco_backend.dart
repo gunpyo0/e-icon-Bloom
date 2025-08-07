@@ -969,109 +969,90 @@ class EcoBackend {
 
   /*──────────────────── League Gardens ────────────────────*/
   /// Get all league members' gardens
+  /// 모든 리그 멤버 정원 한번에 가져오기 – Cloud Function 버전
+      // _auth
+
+  /// 리그 멤버들의 정원 정보를 Cloud Function에서 받아서
+  /// Unity 가 이해할 형태(Map 3×3 tiles)로 변환해 반환한다.
   Future<List<Map<String, dynamic>>> getLeagueMembersGardens() async {
     try {
-      // Get current user's league
-      final myLeagueData = await myLeague();
-      final leagueId = myLeagueData['leagueId'];
+      /* 1) 내 UID 확보 -------------------------------------------------- */
+      final uid = _auth.currentUser?.uid;
+      debugPrint('[getLeagueMembersGardens] myUid = $uid');
+      if (uid == null) return [];
 
-      if (leagueId == null) {
-        print('User not in any league');
-        return [];
-      }
+      /* 2) CF 호출 ------------------------------------------------------ */
+      final res = await _func
+          .httpsCallable('getLeagueMembersGardens')
+          .call({'uid': uid});
+      debugPrint('[getLeagueMembersGardens] raw CF res = ${res.data}');
 
-      print('Getting gardens for league: $leagueId');
+      /* 3) 최상위 data 꺼내기 ------------------------------------------ */
+      final Map<String, dynamic> top = Map<String, dynamic>.from(res.data);
+      final Map<String, dynamic> data = top['data'] is Map
+          ? Map<String, dynamic>.from(top['data'])
+          : top; // 'ok' 필드 없이 data 만 올 수도
+      debugPrint('[getLeagueMembersGardens] extracted data = $data');
 
-      // Get all league members
-      final membersSnapshot = await _fs
-          .collection('leagues')
-          .doc(leagueId)
-          .collection('members')
-          .orderBy('point', descending: true)
-          .get();
+      /* 4) members 배열 파싱 ------------------------------------------- */
+      final List<dynamic> membersRaw = data['members'] ?? [];
+      debugPrint('[getLeagueMembersGardens] membersRaw.length = ${membersRaw.length}');
 
       final List<Map<String, dynamic>> memberGardens = [];
 
-      for (final memberDoc in membersSnapshot.docs) {
-        final memberData = memberDoc.data();
-        final memberUid = memberDoc.id;
+      /* 5) 각 멤버 처리 ------------------------------------------------- */
+      for (final m in membersRaw.take(9)) {
+        final member = Map<String, dynamic>.from(m);
+        debugPrint('  ↳ member uid=${member['uid']} name=${member['name']}');
 
-        try {
-          // Get member's garden data
-          final userDoc = await _fs.collection('users').doc(memberUid).get();
+        /* 5-1) garden 추출 */
+        final gardenRaw = Map<String, dynamic>.from(member['garden'] ?? {});
+        debugPrint('    gardenRaw(size=${gardenRaw['size']} tiles=${gardenRaw['tiles']?.length})');
 
-          if (userDoc.exists) {
-            final userData = userDoc.data()!;
-            final gardenData = userData['garden'];
-
-            if (gardenData != null) {
-              // Process garden data
-              Map<String, dynamic> processedGarden = Map<String, dynamic>.from(gardenData);
-
-              // Process tiles if they exist
-              final rawTiles = processedGarden['tiles'];
-              if (rawTiles != null) {
-                final tiles = <String, dynamic>{};
-                if (rawTiles is Map) {
-                  rawTiles.forEach((key, value) {
-                    if (value is Map) {
-                      tiles[key.toString()] = Map<String, dynamic>.from(value);
-                    }
-                  });
-                  processedGarden['tiles'] = tiles;
-                }
-              }
-
-              // Add member info to garden data
-              processedGarden['memberInfo'] = {
-                'uid': memberUid,
-                'displayName': memberData['displayName'] ?? memberData['name'] ?? 'Unknown Player',
-                'points': memberData['point'] ?? 0,
-                'totalPoints': userData['totalPoints'] ?? 0,
-              };
-
-              processedGarden['size'] = processedGarden['size'] ?? 3;
-
-              memberGardens.add(processedGarden);
-              print('Added garden for ${memberData['displayName']} (${memberData['point']} points)');
-            } else {
-              // Create default garden for member without garden data
-              memberGardens.add({
-                'size': 3,
-                'tiles': {},
-                'memberInfo': {
-                  'uid': memberUid,
-                  'displayName': memberData['displayName'] ?? memberData['name'] ?? 'Unknown Player',
-                  'points': memberData['point'] ?? 0,
-                  'totalPoints': userData['totalPoints'] ?? 0,
-                },
-              });
-            }
+        /* 5-2) tiles 정규화: List → Map<String,dynamic> */
+        if (gardenRaw['tiles'] is List) {
+          debugPrint('    tiles is List → Map 변환');
+          final tilesList = List.from(gardenRaw['tiles']);
+          final tilesMap  = <String, dynamic>{};
+          for (var i = 0; i < tilesList.length; i++) {
+            final t = Map<String, dynamic>.from(tilesList[i]);
+            tilesMap[i.toString()] = t;
           }
-        } catch (e) {
-          print('Error getting garden for member $memberUid: $e');
-          // Add empty garden for failed cases
-          memberGardens.add({
-            'size': 3,
-            'tiles': {},
-            'memberInfo': {
-              'uid': memberUid,
-              'displayName': memberData['displayName'] ?? memberData['name'] ?? 'Unknown Player',
-              'points': memberData['point'] ?? 0,
-              'totalPoints': 0,
-            },
+          gardenRaw['tiles'] = tilesMap;
+        } else if (gardenRaw['tiles'] is Map) {
+          debugPrint('    tiles already Map → key/value 정규화');
+          final tilesNorm = <String, dynamic>{};
+          (gardenRaw['tiles'] as Map).forEach((k, v) {
+            if (v is Map) tilesNorm[k.toString()] = Map<String, dynamic>.from(v);
           });
+          gardenRaw['tiles'] = tilesNorm;
+        } else {
+          debugPrint('    tiles field missing → {}');
+          gardenRaw['tiles'] = {};
         }
+
+        /* 5-3) memberInfo 삽입 ----------------------------------------- */
+        gardenRaw['memberInfo'] = {
+          'uid'        : member['uid'],
+          'displayName': member['name'] ?? 'Unknown Player',
+          'points'     : member['point'] ?? 0,
+          'totalPoints': member['totalPoints'] ?? 0,
+        };
+
+        gardenRaw['size']  ??= gardenRaw['tiles'].length == 9 ? 3 : 3;
+        memberGardens.add(gardenRaw);
+
+        debugPrint('    ✔ processed garden size=${gardenRaw['size']}');
       }
 
-      print('Retrieved ${memberGardens.length} member gardens');
+      debugPrint('[getLeagueMembersGardens] ✅ total processed = ${memberGardens.length}');
       return memberGardens;
-
-    } catch (e) {
-      print('Error getting league members gardens: $e');
+    } catch (e, st) {
+      debugPrint('[getLeagueMembersGardens] ❌ Error: $e\n$st');
       return [];
     }
   }
+
 
   /*──────────────────── 사용자 포인트 조회 ────────────────────*/
   Future<int> getUserPoints() async {
@@ -1084,7 +1065,7 @@ class EcoBackend {
       if (!userDoc.exists) return 0;
 
       final userData = userDoc.data()!;
-      return userData['totalPoints'] ?? 0;
+      return userData['point'] ?? 0;
     } catch (e) {
       print('Error getting user points: $e');
       return 0;
@@ -1366,5 +1347,56 @@ class EcoBackend {
     'isLessonDone': false,
     'quizDone': false,
   };
+/*════════════ 배열-정원(garden.ts) helpers ════════════*/
+
+  /// 배열 기반 정원 조회 (uid 지정 가능, 기본 = 내 uid)
+  Future<Map<String, dynamic>> getArrayGarden({String? uid}) async {
+    uid ??= _auth.currentUser?.uid;
+    if (uid == null) throw Exception('로그인이 필요합니다');
+    final res = await _func.httpsCallable('getGarden').call({'uid': uid});
+    return Map<String, dynamic>.from(res.data);
+  }
+
+  /// 타일 심기 – index: 0 ~ size²-1
+  Future<void> plantTileArray(int index, String cropId) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) throw Exception('로그인이 필요합니다');
+    await _func.httpsCallable('plantTile')
+        .call({'uid': uid, 'index': index, 'cropId': cropId});
+  }
+
+  /// 타일 업그레이드(성장) – index: 0 ~ size²-1
+  Future<void> upgradeTileArray(int index) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) throw Exception('로그인이 필요합니다');
+    debugPrint("끼얏호우${uid}, ${index}");
+    await _func.httpsCallable('upgradeTile')
+        .call({'uid': uid, 'index': index});
+  }
+
+  /// 타일 제거(환급) – index: 0 ~ size²-1
+  Future<void> removeTileArray(int index) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) throw Exception('로그인이 필요합니다');
+    await _func.httpsCallable('removeTile')
+        .call({'uid': uid, 'index': index});
+  }
+
+  /// 정원 총 자산(투자 포인트) 계산
+  Future<int> getGardenAsset() async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return 0;
+    final res = await _func.httpsCallable('getGardenAsset')
+        .call({'uid': uid});
+    return (res.data as Map)['asset'] as int? ?? 0;
+  }
+
+  /// 🔧 (선택) 정원 크기 리사이즈 – league 승급 시 사용
+  Future<void> resizeArrayGarden(int newSize) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) throw Exception('로그인이 필요합니다');
+    await _func.httpsCallable('resizeGarden')
+        .call({'uid': uid, 'newSize': newSize});
+  }
 
 }

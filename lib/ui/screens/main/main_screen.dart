@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:bloom/data/models/crop.dart';
 import 'package:bloom/data/services/eco_backend.dart';
-import 'package:bloom/ui/screens/garden/garden_screen.dart';
 import 'package:bloom/ui/screens/profile/profile_screen.dart';
 import 'package:bloom/providers/points_provider.dart';
 import 'package:go_router/go_router.dart';
