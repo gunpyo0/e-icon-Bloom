@@ -885,7 +885,7 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
                     title: 'Membership',
                     subtitle: 'Unlock Premium Features',
                     onTap: () {
-                      // Navigate to membership screen
+                      context.push('/membership');
                     },
                   ),
 

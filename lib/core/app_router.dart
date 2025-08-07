@@ -7,10 +7,15 @@ import 'package:bloom/ui/screens/profile/profile_screen.dart';
 import 'package:bloom/ui/screens/garden/garden_screen.dart';
 import 'package:bloom/ui/screens/learn/learn_screen.dart';
 import 'package:bloom/ui/screens/evaluation/evaluation_screen.dart';
+import 'package:bloom/ui/screens/membership/membership_screen.dart';
+import 'package:bloom/ui/screens/product/product_screen.dart';
 import 'package:bloom/ui/screens/eco_debug_page.dart';
 import 'package:bloom/data/services/eco_backend.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:bloom/providers/membership_provider.dart';
+import 'package:bloom/ui/widgets/vip_badge.dart';
 import '../ui/screens/main/main_screen.dart';
 
 final appRouter = GoRouter(
@@ -58,11 +63,19 @@ final appRouter = GoRouter(
       builder: (context, state) => const FundCreateScreen(),
     ),
     GoRoute(
+      path: '/product',
+      builder: (context, state) => const ProductScreen(),
+    ),
+    GoRoute(
       path: '/fund/:fundId',
       builder: (context, state) {
         final fundId = state.pathParameters['fundId']!;
         return FundDetailScreen(fundId: fundId);
       },
+    ),
+    GoRoute(
+      path: '/membership',
+      builder: (context, state) => const MembershipScreen(),
     ),
     GoRoute(
       path: '/debug',
@@ -75,14 +88,14 @@ final appRouter = GoRouter(
 // GlobalKey for MainScaffold to access tab switching from anywhere
 final GlobalKey<_MainScaffoldState> mainScaffoldKey = GlobalKey<_MainScaffoldState>();
 
-class MainScaffold extends StatefulWidget {
+class MainScaffold extends ConsumerStatefulWidget {
   const MainScaffold({super.key});
 
   @override
-  State<MainScaffold> createState() => _MainScaffoldState();
+  ConsumerState<MainScaffold> createState() => _MainScaffoldState();
 }
 
-class _MainScaffoldState extends State<MainScaffold>
+class _MainScaffoldState extends ConsumerState<MainScaffold>
     with TickerProviderStateMixin {
   int _index = 2; // 0: info, 1: garden, 2: main, 3: learn, 4: fund
   late PageController _pageController;
@@ -218,6 +231,8 @@ class _MainScaffoldState extends State<MainScaffold>
                   color: Colors.white,
                 ),
               ),
+              const SizedBox(width: 12),
+              const VipBadge(size: 20, showText: true),
             ],
           ),
           const Spacer(),
