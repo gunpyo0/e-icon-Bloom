@@ -1,9 +1,8 @@
 import 'package:bloom/data/models/quiz.dart';
+import 'package:bloom/data/services/backend_providers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:bloom/data/services/eco_backend.dart';
-import 'package:bloom/data/models/lesson_models.dart';
-import 'package:bloom/providers/points_provider.dart';
 
 class QuizScreen extends ConsumerStatefulWidget {
   final String lessonId;
@@ -102,7 +101,7 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
       });
 
       if (result['awarded'] is int && result['awarded'] > 0) {
-        ref.read(pointsProvider.notifier).refresh();
+        await ref.refresh(userPointsProvider.future);
       }
 
       setState(() {
@@ -138,7 +137,7 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
       );
 
       // Refresh points
-      await ref.read(pointsProvider.notifier).refresh();
+      await ref.refresh(userPointsProvider.future);
 
       if (mounted) {
         _showCompletionDialog();

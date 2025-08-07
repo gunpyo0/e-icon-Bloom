@@ -1,5 +1,5 @@
     import 'package:bloom/data/models/lesson_models.dart';
-import 'package:bloom/providers/points_provider.dart';
+import 'package:bloom/data/services/backend_providers.dart';
 import 'package:flutter/material.dart';
     import 'package:flutter_riverpod/flutter_riverpod.dart';
     import 'package:bloom/data/services/eco_backend.dart';
@@ -532,7 +532,7 @@ import 'package:flutter/material.dart';
           
           if (stepInfo['addPoint'] > 0) {
             // 즉시 포인트 반영
-            ref.read(pointsProvider.notifier).refresh();
+            ref.refresh(userPointsProvider);
           }
 
           if (stepInfo['isLessonDone'] == true) {

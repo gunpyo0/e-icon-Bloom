@@ -1,10 +1,10 @@
 
 
+import 'package:bloom/data/services/backend_providers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'fund_viewmodel.dart';
 import 'package:bloom/data/services/eco_backend.dart';
-import 'package:bloom/providers/points_provider.dart';
 
 class FundDetailScreen extends ConsumerWidget {
   final String fundId;
@@ -364,7 +364,7 @@ class _FundingDialogState extends ConsumerState<_FundingDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final pointsAsync = ref.watch(pointsProvider);
+    final pointsAsync = ref.watch(userPointsProvider);
 
     return AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -513,20 +513,14 @@ class _FundingDialogState extends ConsumerState<_FundingDialog> {
 
     setState(() => _isLoading = true);
     try {
-      final totalPoints = ref.read(pointsProvider).value ?? 0;
+      final totalPoints = ref.read(userPointsProvider).value ?? 0;
       if (amount > totalPoints) { 
         _showSnackBar(context, '포인트 부족해 😭', Colors.red); 
         return; 
       }
 
       print('💰 Starting donation: $amount points');
-      
-      // 1. 낙관적 포인트 차감 (즉시 UI 업데이트)
-      final pointsSuccess = await ref.read(pointsProvider.notifier).subtractPoints(amount);
-      if (!pointsSuccess) {
-        _showSnackBar(context, '포인트 처리 실패', Colors.red);
-        return;
-      }
+      ref.refresh(userPointsProvider);
 
       // 2. 서버에 기부 요청
       await EcoBackend.instance.donate(campaignId: widget.project.id, amount: amount);
@@ -537,7 +531,7 @@ class _FundingDialogState extends ConsumerState<_FundingDialog> {
       print('✅ Fund projects refreshed');
 
       // 4. 최종 포인트 동기화 확인
-      await ref.read(pointsProvider.notifier).refresh();
+      await ref.refresh(userPointsProvider);
       print('✅ Points synchronized');
 
       if (mounted) {
@@ -547,7 +541,7 @@ class _FundingDialogState extends ConsumerState<_FundingDialog> {
     } catch (e) {
       print('❌ Donation failed: $e');
       // 실패 시 포인트 다시 새로고침하여 서버 상태와 동기화
-      await ref.read(pointsProvider.notifier).refresh();
+      await ref.refresh(userPointsProvider);
       if (mounted) _showSnackBar(context, '펀딩 실패: $e', Colors.red);
     } finally {
       if (mounted) setState(() => _isLoading = false);

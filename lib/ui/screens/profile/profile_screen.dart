@@ -1,9 +1,9 @@
+import 'package:bloom/data/services/backend_providers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:bloom/data/services/eco_backend.dart';
-import 'package:bloom/providers/points_provider.dart';
 
 final currentUserProvider = StreamProvider<User?>((ref) {
   return FirebaseAuth.instance.authStateChanges();
@@ -36,7 +36,7 @@ class ProfileScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final profileAsync = ref.watch(profileProvider);
     final leagueAsync = ref.watch(leagueProvider);
-    final pointsAsync = ref.watch(pointsProvider);
+    final pointsAsync = ref.watch(userPointsProvider);
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -65,7 +65,7 @@ class ProfileScreen extends ConsumerWidget {
         onRefresh: () async {
           ref.invalidate(profileProvider);
           ref.invalidate(leagueProvider);
-          await ref.read(pointsProvider.notifier).refresh();
+          await ref.refresh(userPointsProvider.future);
         },
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
@@ -235,7 +235,7 @@ class ProfileScreen extends ConsumerWidget {
                   // Real-time points display
                   Consumer(
                     builder: (context, ref, child) {
-                      final pointsAsync = ref.watch(pointsProvider);
+                      final pointsAsync = ref.watch(userPointsProvider);
                       return pointsAsync.when(
                         data: (totalPoints) => _buildStatRow('Total Points', '$totalPoints P'),
                         loading: () => _buildStatRow('Total Points', 'Loading...'),

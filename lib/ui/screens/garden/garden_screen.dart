@@ -1,9 +1,9 @@
+import 'package:bloom/data/services/backend_providers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:bloom/data/services/eco_backend.dart';
 import 'package:bloom/data/models/crop.dart';
 import 'package:bloom/ui/screens/profile/profile_screen.dart';
-import 'package:bloom/providers/points_provider.dart';
 import 'package:bloom/ui/widgets/ranking_widget.dart';
 
 final gardenProvider = FutureProvider<Garden>((ref) async {
@@ -43,7 +43,7 @@ class _GardenScreenState extends ConsumerState<GardenScreen> with WidgetsBinding
 
   void _refreshData() {
     // 포인트 provider 새로고침
-    ref.read(pointsProvider.notifier).forceSync();
+    ref.refresh(userPointsProvider.future);
     
     // 정원 데이터 새로고침 
     ref.refresh(gardenProvider);
@@ -161,7 +161,7 @@ class _GardenScreenState extends ConsumerState<GardenScreen> with WidgetsBinding
                   const SizedBox(width: 4),
                   Consumer(
                     builder: (context, ref, child) {
-                      final pointsAsync = ref.watch(pointsProvider);
+                      final pointsAsync = ref.watch(userPointsProvider);
                       return pointsAsync.when(
                         data: (points) => Text(
                           '$points P',
@@ -1079,7 +1079,7 @@ class _GardenScreenState extends ConsumerState<GardenScreen> with WidgetsBinding
               // 현재 포인트 표시
               Consumer(
                 builder: (context, ref, child) {
-                  final pointsAsync = ref.watch(pointsProvider);
+                  final pointsAsync = ref.watch(userPointsProvider);
                   return pointsAsync.when(
                     data: (totalPoints) => Container(
                       padding: const EdgeInsets.all(12),
@@ -1133,7 +1133,7 @@ class _GardenScreenState extends ConsumerState<GardenScreen> with WidgetsBinding
                 
                 return Consumer(
                   builder: (context, ref, child) {
-                    final pointsAsync = ref.watch(pointsProvider);
+                    final pointsAsync = ref.watch(userPointsProvider);
                     return pointsAsync.when(
                       data: (totalPoints) {
                         final canAfford = totalPoints >= plantCost;
@@ -1262,7 +1262,7 @@ class _GardenScreenState extends ConsumerState<GardenScreen> with WidgetsBinding
             
             Consumer(
               builder: (context, ref, child) {
-                final pointsAsync = ref.watch(pointsProvider);
+                final pointsAsync = ref.watch(userPointsProvider);
                 return pointsAsync.when(
                   data: (totalPoints) {
                     final canAfford = totalPoints >= cost;
@@ -1345,7 +1345,7 @@ class _GardenScreenState extends ConsumerState<GardenScreen> with WidgetsBinding
           ),
           Consumer(
             builder: (context, ref, child) {
-              final pointsAsync = ref.watch(pointsProvider);
+              final pointsAsync = ref.watch(userPointsProvider);
               return pointsAsync.when(
                 data: (totalPoints) {
                   final canAfford = totalPoints >= cost;
@@ -1502,7 +1502,7 @@ class _GardenScreenState extends ConsumerState<GardenScreen> with WidgetsBinding
       await EcoBackend.instance.plantCropWithPoints(tile.x, tile.y, crop.id, plantCost);
       
       // 프로필과 정원 새로고침
-      ref.read(pointsProvider.notifier).refresh();
+      ref.refresh(userPointsProvider.future);
       ref.refresh(gardenProvider);
       
       if (context.mounted) {
@@ -1553,7 +1553,7 @@ class _GardenScreenState extends ConsumerState<GardenScreen> with WidgetsBinding
       await EcoBackend.instance.progressCropWithPoints(tile.x, tile.y, growthCost);
       
       // 프로필과 정원 새로고침
-      ref.read(pointsProvider.notifier).refresh();
+      await ref.refresh(userPointsProvider.future);
       ref.refresh(gardenProvider);
       
       if (context.mounted) {
@@ -1587,10 +1587,8 @@ class _GardenScreenState extends ConsumerState<GardenScreen> with WidgetsBinding
       final earnedPoints = await EcoBackend.instance.harvestCropWithPoints(tile.x, tile.y, crop.reward);
       
       // 포인트를 즉시 추가 (UI 빠른 반응용)
-      ref.read(pointsProvider.notifier).addPoints(earnedPoints);
-      
-      // 실제 포인트 새로고침 (정확한 값 확인용)
-      await ref.read(pointsProvider.notifier).refresh();
+      await ref.refresh(userPointsProvider.future);
+
       ref.refresh(gardenProvider);
       
       if (context.mounted) {

@@ -1,9 +1,9 @@
+import 'package:bloom/data/services/backend_providers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:bloom/data/models/crop.dart';
 import 'package:bloom/data/services/eco_backend.dart';
 import 'package:bloom/ui/screens/profile/profile_screen.dart';
-import 'package:bloom/providers/points_provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:bloom/core/app_router.dart';
 
@@ -29,7 +29,7 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
     
     // 포인트 초기 로드
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(pointsProvider.notifier).refresh();
+      ref.refresh(userPointsProvider);
     });
   }
 
@@ -44,7 +44,7 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
     super.didChangeAppLifecycleState(state);
     if (state == AppLifecycleState.resumed) {
       // 앱이 포그라운드로 돌아올 때 포인트 새로고침
-      ref.read(pointsProvider.notifier).refresh();
+      ref.refresh(userPointsProvider);
     }
   }
 
@@ -130,7 +130,7 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
   Widget build(BuildContext context) {
     super.build(context); // AutomaticKeepAliveClientMixin 필요
     
-    final pointsAsync = ref.watch(pointsProvider);
+    final pointsAsync = ref.watch(userPointsProvider);
     
     // 디버그: 포인트 상태 로그
     pointsAsync.when(
@@ -148,7 +148,7 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
             ? const Center(child: CircularProgressIndicator())
             : RefreshIndicator(
               onRefresh: () async {
-                await ref.read(pointsProvider.notifier).refresh();
+                await ref.refresh(userPointsProvider);
                 await _loadData();
               },
               child: SingleChildScrollView(
@@ -659,7 +659,7 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
                               ),
                               TextButton(
                                 onPressed: () {
-                                  // Navigate to ranking screen
+                                  context.push('/ranking');
                                 },
                                 child: Text(
                                   'View More',
@@ -680,7 +680,7 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
                       GestureDetector(
                         onTap: () {
                           // 포인트 표시를 탭하면 새로고침
-                          ref.read(pointsProvider.notifier).refresh();
+                          ref.refresh(userPointsProvider);
                         },
                         child: pointsAsync.when(
                           data: (totalPoints) {

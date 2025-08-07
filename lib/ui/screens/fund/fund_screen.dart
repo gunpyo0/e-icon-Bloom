@@ -1,11 +1,11 @@
 // lib/ui/screens/fund/fund_screen.dart
+import 'package:bloom/data/services/backend_providers.dart';
 import 'package:bloom/data/services/eco_backend.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'fund_viewmodel.dart';
-import 'package:bloom/providers/points_provider.dart';
 class FundScreen extends ConsumerStatefulWidget {
   const FundScreen({super.key});
 
@@ -106,7 +106,7 @@ class _FundScreenState extends ConsumerState<FundScreen>
 
 
   Widget _buildPointsHeader(BuildContext context, WidgetRef ref) {
-    final pointsAsync = ref.watch(pointsProvider);
+    final pointsAsync = ref.watch(userPointsProvider);
     
     return Container(
       width: double.infinity,

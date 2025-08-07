@@ -3,12 +3,14 @@ import 'package:bloom/ui/screens/fund/fund_screen.dart';
 import 'package:bloom/ui/screens/fund/fund_detail_screen.dart';
 import 'package:bloom/ui/screens/auth/login_screen.dart';
 import 'package:bloom/ui/screens/auth/signup_screen.dart';
+import 'package:bloom/ui/screens/garden/unity.dart';
 import 'package:bloom/ui/screens/profile/profile_screen.dart';
 import 'package:bloom/ui/screens/garden/garden_screen.dart';
 import 'package:bloom/ui/screens/learn/learn_screen.dart';
 import 'package:bloom/ui/screens/evaluation/evaluation_screen.dart';
 import 'package:bloom/ui/screens/membership/membership_screen.dart';
 import 'package:bloom/ui/screens/product/product_screen.dart';
+import 'package:bloom/ui/screens/ranking/ranking_screen.dart';
 import 'package:bloom/ui/screens/eco_debug_page.dart';
 import 'package:bloom/data/services/eco_backend.dart';
 import 'package:flutter/material.dart';
@@ -52,7 +54,7 @@ final appRouter = GoRouter(
     ),
     GoRoute(
       path: '/garden',
-      builder: (context, state) => const GardenScreen(),
+      builder: (context, state) => const UnityFullScreen(),
     ),
     GoRoute(
       path: '/learn',
@@ -81,6 +83,10 @@ final appRouter = GoRouter(
       path: '/debug',
       builder: (context, state) => const EcoDebugPage(),
     ),
+    GoRoute(
+      path: '/ranking',
+      builder: (context, state) => const RankingScreen(),
+    ),
 
   ],
 );
@@ -103,7 +109,7 @@ class _MainScaffoldState extends ConsumerState<MainScaffold>
 
   final pages = [
     const EvaluationScreen(),
-    const GardenScreen(),
+    const UnityFullScreen(),
     const MainScreen(),
     const LearnScreen(),
     const FundScreen(),
@@ -155,6 +161,9 @@ class _MainScaffoldState extends ConsumerState<MainScaffold>
           ),
           Expanded(
             child: PageView(
+              physics: _index == 1                                // 현재 페이지가 Garden?
+                  ? const NeverScrollableScrollPhysics()          // 세로 스크롤 잠금
+                  : const PageScrollPhysics(),
               controller: _pageController,
               onPageChanged: (index) {
                 setState(() => _index = index);
