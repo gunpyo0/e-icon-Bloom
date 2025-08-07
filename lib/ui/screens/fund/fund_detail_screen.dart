@@ -19,7 +19,7 @@ class FundDetailScreen extends ConsumerWidget {
     final fundState = ref.watch(fundViewModelProvider);
 
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
@@ -35,14 +35,7 @@ class FundDetailScreen extends ConsumerWidget {
             fontWeight: FontWeight.bold,
           ),
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.share, color: Colors.black),
-            onPressed: () {
-              // Share functionality
-            },
-          ),
-        ],
+        actions: [],
       ),
       body: fundState.when(
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -85,13 +78,29 @@ class FundDetailScreen extends ConsumerWidget {
       color: Colors.black,
       child: Stack(
         children: [
-          project.imageUrl != null
+          project.imageUrl != null && project.imageUrl!.isNotEmpty
             ? Image.network(
                 project.imageUrl!,
                 width: double.infinity,
                 height: double.infinity,
                 fit: BoxFit.cover,
+                loadingBuilder: (context, child, loadingProgress) {
+                  if (loadingProgress == null) return child;
+                  return Container(
+                    color: Colors.black,
+                    child: Center(
+                      child: CircularProgressIndicator(
+                        value: loadingProgress.expectedTotalBytes != null
+                            ? loadingProgress.cumulativeBytesLoaded / 
+                              loadingProgress.expectedTotalBytes!
+                            : null,
+                        valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    ),
+                  );
+                },
                 errorBuilder: (context, error, stackTrace) {
+                  debugPrint('❌ Image load error: $error for URL: ${project.imageUrl}');
                   return Container(
                     color: Colors.black,
                     child: const Center(
@@ -126,6 +135,8 @@ class FundDetailScreen extends ConsumerWidget {
                     fontSize: 28,
                     fontWeight: FontWeight.bold,
                   ),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 2,
                 ),
                 const SizedBox(height: 8),
                 Text(
@@ -376,6 +387,8 @@ class _FundingDialogState extends ConsumerState<_FundingDialog> {
             Text(
               widget.project.title,
               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
             ),
             const SizedBox(height: 16),
 
@@ -493,26 +506,48 @@ class _FundingDialogState extends ConsumerState<_FundingDialog> {
   Future<void> _handleFunding(BuildContext context) async {
     final amountText = _amountController.text.trim();
     final amount = int.tryParse(amountText);
-    if (amount == null || amount <= 0) { _showSnackBar(context, '올바른 포인트 입력해줘!', Colors.red); return; }
+    if (amount == null || amount <= 0) { 
+      _showSnackBar(context, '올바른 포인트 입력해줘!', Colors.red); 
+      return; 
+    }
 
     setState(() => _isLoading = true);
     try {
       final totalPoints = ref.read(pointsProvider).value ?? 0;
-      if (amount > totalPoints) { _showSnackBar(context, '포인트 부족해 😭', Colors.red); return; }
+      if (amount > totalPoints) { 
+        _showSnackBar(context, '포인트 부족해 😭', Colors.red); 
+        return; 
+      }
 
-      // 🔗 서버 Functions 호출!
+      print('💰 Starting donation: $amount points');
+      
+      // 1. 낙관적 포인트 차감 (즉시 UI 업데이트)
+      final pointsSuccess = await ref.read(pointsProvider.notifier).subtractPoints(amount);
+      if (!pointsSuccess) {
+        _showSnackBar(context, '포인트 처리 실패', Colors.red);
+        return;
+      }
+
+      // 2. 서버에 기부 요청
       await EcoBackend.instance.donate(campaignId: widget.project.id, amount: amount);
+      print('✅ Donation completed on server');
 
-      // 포인트·프로젝트 새로고침
-      ref.read(pointsProvider.notifier).subtractPoints(amount);
+      // 3. 펀딩 프로젝트 새로고침 (기부 후 금액 업데이트)
       await ref.read(fundViewModelProvider.notifier).refresh();
+      print('✅ Fund projects refreshed');
+
+      // 4. 최종 포인트 동기화 확인
       await ref.read(pointsProvider.notifier).refresh();
+      print('✅ Points synchronized');
 
       if (mounted) {
         Navigator.of(context).pop();
         _showSnackBar(context, '$amount P 기부 완료! 고마워 💚', Colors.green);
       }
     } catch (e) {
+      print('❌ Donation failed: $e');
+      // 실패 시 포인트 다시 새로고침하여 서버 상태와 동기화
+      await ref.read(pointsProvider.notifier).refresh();
       if (mounted) _showSnackBar(context, '펀딩 실패: $e', Colors.red);
     } finally {
       if (mounted) setState(() => _isLoading = false);

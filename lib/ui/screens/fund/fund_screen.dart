@@ -17,9 +17,6 @@ class FundScreen extends ConsumerStatefulWidget {
 class _FundScreenState extends ConsumerState<FundScreen>
     with WidgetsBindingObserver {
 
-  /*── 🔑 전용 UID ──*/
-  bool get _isOwner =>
-      EcoBackend.instance.currentUser?.uid == 'ClOYnvB9npXjR95TKA4Ik88BS1q2';
 
   /*── 생명주기 등록 ─*/
   @override
@@ -54,7 +51,7 @@ class _FundScreenState extends ConsumerState<FundScreen>
     final isLoading      = ref.watch(fundLoadingProvider);
 
     return Scaffold(
-      backgroundColor: Color.fromRGBO(244, 234, 225, 1),
+      backgroundColor: Colors.white,
       body: Stack(                                  // ⬅️ ① Stack으로 감싸기
         children: [
           Column(
@@ -90,12 +87,19 @@ class _FundScreenState extends ConsumerState<FundScreen>
             ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: _isOwner
-            ? Colors.green
-            : Colors.grey.shade400.withOpacity(.6),
-        onPressed: _isOwner ? () => context.push('/fund/create') : null,
-        child: const Icon(Icons.add),
+      floatingActionButton: FloatingActionButton.extended(
+        backgroundColor: Colors.green[600],
+        foregroundColor: Colors.white,
+        onPressed: () => context.push('/fund/create'),
+        icon: const Icon(Icons.add),
+        label: const Text(
+          'New Project',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        elevation: 8,
+        extendedPadding: const EdgeInsets.symmetric(horizontal: 20),
       ),
     );
   }
@@ -640,7 +644,7 @@ class _FundScreenState extends ConsumerState<FundScreen>
               ),
               child: Stack(
                 children: [
-                  project.imageUrl != null 
+                  project.imageUrl != null && project.imageUrl!.isNotEmpty
                     ? ClipRRect(
                         borderRadius: const BorderRadius.only(
                           topLeft: Radius.circular(12),
@@ -651,7 +655,23 @@ class _FundScreenState extends ConsumerState<FundScreen>
                           width: double.infinity,
                           height: double.infinity,
                           fit: BoxFit.cover,
+                          loadingBuilder: (context, child, loadingProgress) {
+                            if (loadingProgress == null) return child;
+                            return Container(
+                              color: Colors.black,
+                              child: Center(
+                                child: CircularProgressIndicator(
+                                  value: loadingProgress.expectedTotalBytes != null
+                                      ? loadingProgress.cumulativeBytesLoaded / 
+                                        loadingProgress.expectedTotalBytes!
+                                      : null,
+                                  valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+                                ),
+                              ),
+                            );
+                          },
                           errorBuilder: (context, error, stackTrace) {
+                            debugPrint('❌ Image load error: $error for URL: ${project.imageUrl}');
                             return Container(
                               color: Colors.black,
                               child: const Center(
@@ -828,12 +848,25 @@ class _FundScreenState extends ConsumerState<FundScreen>
       child: Container(
         margin: const EdgeInsets.only(bottom: 20),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Colors.white,
+              Colors.grey[50]!,
+            ],
+          ),
+          borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: Colors.black26,
-              blurRadius: 10,
+              color: Colors.green.withOpacity(0.1),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
+              spreadRadius: 2,
+            ),
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 15,
               offset: const Offset(0, 4),
             ),
           ],
@@ -843,14 +876,21 @@ class _FundScreenState extends ConsumerState<FundScreen>
           children: [
             // 프로젝트 이미지
             Container(
-              height: 200,
+              height: 220,
               width: double.infinity,
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 color: Colors.black,
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(12),
-                  topRight: Radius.circular(12),
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(20),
+                  topRight: Radius.circular(20),
                 ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.2),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
               child: Stack(
                 children: [
@@ -861,20 +901,36 @@ class _FundScreenState extends ConsumerState<FundScreen>
                     decoration: const BoxDecoration(
                       color: Colors.black,
                       borderRadius: BorderRadius.only(
-                        topLeft: Radius.circular(12),
-                        topRight: Radius.circular(12),
+                        topLeft: Radius.circular(20),
+                        topRight: Radius.circular(20),
                       ),
                     ),
-                    child: project.imageUrl != null 
+                    child: project.imageUrl != null && project.imageUrl!.isNotEmpty
                       ? ClipRRect(
                           borderRadius: const BorderRadius.only(
-                            topLeft: Radius.circular(12),
-                            topRight: Radius.circular(12),
+                            topLeft: Radius.circular(20),
+                            topRight: Radius.circular(20),
                           ),
                           child: Image.network(
                             project.imageUrl!,
                             fit: BoxFit.cover,
+                            loadingBuilder: (context, child, loadingProgress) {
+                              if (loadingProgress == null) return child;
+                              return Container(
+                                color: Colors.black,
+                                child: Center(
+                                  child: CircularProgressIndicator(
+                                    value: loadingProgress.expectedTotalBytes != null
+                                        ? loadingProgress.cumulativeBytesLoaded / 
+                                          loadingProgress.expectedTotalBytes!
+                                        : null,
+                                    valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+                                  ),
+                                ),
+                              );
+                            },
                             errorBuilder: (context, error, stackTrace) {
+                              debugPrint('❌ Image load error: $error for URL: ${project.imageUrl}');
                               return Container(
                                 color: Colors.black,
                                 child: const Center(
@@ -901,50 +957,45 @@ class _FundScreenState extends ConsumerState<FundScreen>
                   Positioned(
                     left: 20,
                     top: 20,
-                    child: Text(
-                      project.title,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
+                    right: 20,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            Colors.black.withOpacity(0.7),
+                            Colors.black.withOpacity(0.3),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(15),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.3),
+                            blurRadius: 8,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Text(
+                        project.title,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          shadows: [
+                            Shadow(
+                              color: Colors.black54,
+                              offset: Offset(1, 1),
+                              blurRadius: 3,
+                            ),
+                          ],
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 2,
                       ),
                     ),
                   ),
                   
-                  // 다운로드/공유 버튼
-                  Positioned(
-                    right: 20,
-                    bottom: 20,
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Colors.white24,
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: const Icon(
-                            Icons.download,
-                            color: Colors.white,
-                            size: 20,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Colors.white24,
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: const Icon(
-                            Icons.share,
-                            color: Colors.white,
-                            size: 20,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
                 ],
               ),
             ),
@@ -957,18 +1008,37 @@ class _FundScreenState extends ConsumerState<FundScreen>
                 children: [
                   // 진행률 바
                   Container(
-                    height: 8,
+                    height: 12,
                     decoration: BoxDecoration(
-                      color: Colors.grey[300],
-                      borderRadius: BorderRadius.circular(4),
+                      color: Colors.grey[200],
+                      borderRadius: BorderRadius.circular(10),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
                     ),
                     child: FractionallySizedBox(
                       alignment: Alignment.centerLeft,
                       widthFactor: progressPercentage / 100,
                       child: Container(
                         decoration: BoxDecoration(
-                          color: Colors.green,
-                          borderRadius: BorderRadius.circular(4),
+                          gradient: LinearGradient(
+                            colors: [
+                              Colors.green[400]!,
+                              Colors.green[600]!,
+                            ],
+                          ),
+                          borderRadius: BorderRadius.circular(10),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.green.withOpacity(0.3),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
                         ),
                       ),
                     ),
@@ -980,42 +1050,77 @@ class _FundScreenState extends ConsumerState<FundScreen>
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        '${project.currentAmount.toStringAsFixed(0)} Points',
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${project.currentAmount.toStringAsFixed(0)} Points',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.green[700],
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'raised of ${project.targetAmount.toStringAsFixed(0)} goal',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.grey[600],
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
                       ),
-                      Text(
-                        '${progressPercentageReal.toStringAsFixed(0)}%',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w500,
-                          color: Colors.green,
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              Colors.green[100]!,
+                              Colors.green[200]!,
+                            ],
+                          ),
+                          borderRadius: BorderRadius.circular(15),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.green.withOpacity(0.2),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Text(
+                          '${progressPercentageReal.toStringAsFixed(0)}%',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.green[800],
+                          ),
                         ),
                       ),
                     ],
                   ),
                   
-                  const SizedBox(height: 4),
-                  
-                  Text(
-                    'Goal: ${project.targetAmount.toStringAsFixed(0)} Points',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                  
                   const SizedBox(height: 8),
                   
-                  Text(
-                    '${project.daysLeft} days left',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey[600],
-                    ),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.schedule,
+                        size: 16,
+                        color: Colors.orange[600],
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${project.daysLeft} days left',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.orange[700],
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),

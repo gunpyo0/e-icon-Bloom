@@ -2,6 +2,7 @@ import 'package:bloom/ui/screens/fund/fund_create_screen.dart';
 import 'package:bloom/ui/screens/fund/fund_screen.dart';
 import 'package:bloom/ui/screens/fund/fund_detail_screen.dart';
 import 'package:bloom/ui/screens/auth/login_screen.dart';
+import 'package:bloom/ui/screens/auth/signup_screen.dart';
 import 'package:bloom/ui/screens/profile/profile_screen.dart';
 import 'package:bloom/ui/screens/garden/garden_screen.dart';
 import 'package:bloom/ui/screens/learn/learn_screen.dart';
@@ -17,11 +18,12 @@ final appRouter = GoRouter(
   redirect: (context, state) {
     final isLoggedIn = EcoBackend.instance.currentUser != null;
     final isLoginRoute = state.uri.path == '/login';
+    final isSignupRoute = state.uri.path == '/signup';
     
-    if (!isLoggedIn && !isLoginRoute) {
+    if (!isLoggedIn && !isLoginRoute && !isSignupRoute) {
       return '/login';
     }
-    if (isLoggedIn && isLoginRoute) {
+    if (isLoggedIn && (isLoginRoute || isSignupRoute)) {
       return '/';
     }
     return null;
@@ -32,12 +34,24 @@ final appRouter = GoRouter(
       builder: (context, state) => const LoginScreen(),
     ),
     GoRoute(
+      path: '/signup',
+      builder: (context, state) => const SignUpScreen(),
+    ),
+    GoRoute(
       path: '/',
-      builder: (context, state) => const MainScaffold(),
+      builder: (context, state) => MainScaffold(key: mainScaffoldKey),
     ),
     GoRoute(
       path: '/profile',
       builder: (context, state) => const ProfileScreen(),
+    ),
+    GoRoute(
+      path: '/garden',
+      builder: (context, state) => const GardenScreen(),
+    ),
+    GoRoute(
+      path: '/learn',
+      builder: (context, state) => const LearnScreen(),
     ),
     GoRoute(
       path: '/fund/create',
@@ -57,6 +71,9 @@ final appRouter = GoRouter(
 
   ],
 );
+
+// GlobalKey for MainScaffold to access tab switching from anywhere
+final GlobalKey<_MainScaffoldState> mainScaffoldKey = GlobalKey<_MainScaffoldState>();
 
 class MainScaffold extends StatefulWidget {
   const MainScaffold({super.key});
@@ -105,6 +122,11 @@ class _MainScaffoldState extends State<MainScaffold>
         curve: Curves.easeInOut,
       );
     }
+  }
+
+  // External method to switch tabs
+  void switchToTab(int index) {
+    _onDestinationSelected(index);
   }
 
   @override

@@ -3,6 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:bloom/data/services/eco_backend.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:flutter/foundation.dart' show kIsWeb, Uint8List;
+import 'package:firebase_storage/firebase_storage.dart';
+import 'dart:io';
 
 class FundCreateScreen extends ConsumerStatefulWidget {
   const FundCreateScreen({super.key});
@@ -20,6 +24,11 @@ class _FundCreateScreenState extends ConsumerState<FundCreateScreen> {
   DateTime? _endDate;
 
   bool _isLoading = false;
+  
+  /*──── 이미지 관련 ────*/
+  XFile? _selectedImage;
+  Uint8List? _imageBytes;
+  final ImagePicker _picker = ImagePicker();
 
   /*──── UID 체크 ────*/
   bool get _isOwner =>
@@ -37,18 +46,18 @@ class _FundCreateScreenState extends ConsumerState<FundCreateScreen> {
   /*──── UI ────*/
   @override
   Widget build(BuildContext context) {
-    if (!_isOwner) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('Create Fund')),
-        body: const Center(
-          child: Text(
-            '⚠️  You do not have permission to create a funding campaign.',
-            style: TextStyle(fontSize: 16),
-            textAlign: TextAlign.center,
-          ),
-        ),
-      );
-    }
+    // if (!_isOwner) {
+    //   return Scaffold(
+    //     appBar: AppBar(title: const Text('Create Fund')),
+    //     body: const Center(
+    //       child: Text(
+    //         '⚠️  You do not have permission to create a funding campaign.',
+    //         style: TextStyle(fontSize: 16),
+    //         textAlign: TextAlign.center,
+    //       ),
+    //     ),
+    //   );
+    // }
 
     return Scaffold(
       appBar: AppBar(
@@ -76,6 +85,8 @@ class _FundCreateScreenState extends ConsumerState<FundCreateScreen> {
             ),
             const SizedBox(height: 12),
             _buildDatePicker(context),
+            const SizedBox(height: 12),
+            _buildImagePicker(),
             const SizedBox(height: 24),
             SizedBox(
               width: double.infinity,
@@ -170,6 +181,145 @@ class _FundCreateScreenState extends ConsumerState<FundCreateScreen> {
     );
   }
 
+  Widget _buildImagePicker() {
+    return Container(
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey.shade400),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        children: [
+          // 이미지 선택 헤더
+          Container(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                const Icon(Icons.image, size: 20),
+                const SizedBox(width: 8),
+                const Text(
+                  'Project Image',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const Spacer(),
+                TextButton.icon(
+                  onPressed: _pickImage,
+                  icon: const Icon(Icons.add_photo_alternate, size: 18),
+                  label: const Text('Select Image'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: Colors.green,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          
+          // 선택된 이미지 또는 플레이스홀더
+          Container(
+            width: double.infinity,
+            height: 200,
+            margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.grey.shade300),
+            ),
+            child: _selectedImage != null && _imageBytes != null
+                ? ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: kIsWeb
+                        ? Image.memory(
+                            _imageBytes!,
+                            width: double.infinity,
+                            height: double.infinity,
+                            fit: BoxFit.cover,
+                          )
+                        : Image.file(
+                            File(_selectedImage!.path),
+                            width: double.infinity,
+                            height: double.infinity,
+                            fit: BoxFit.cover,
+                          ),
+                  )
+                : Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.image_outlined,
+                        size: 64,
+                        color: Colors.grey[400],
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'No image selected',
+                        style: TextStyle(
+                          color: Colors.grey[600],
+                          fontSize: 16,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Tap "Select Image" to choose a photo',
+                        style: TextStyle(
+                          color: Colors.grey[500],
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+          ),
+          
+          // 선택된 이미지가 있을 때 제거 버튼
+          if (_selectedImage != null)
+            Container(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: _removeImage,
+                icon: const Icon(Icons.delete_outline, size: 18),
+                label: const Text('Remove Image'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.red,
+                  side: BorderSide(color: Colors.red.shade300),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  /*──── 이미지 선택 및 제거 ────*/
+  Future<void> _pickImage() async {
+    try {
+      final XFile? image = await _picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1920,
+        maxHeight: 1080,
+        imageQuality: 85,
+      );
+      
+      if (image != null) {
+        final bytes = await image.readAsBytes();
+        setState(() {
+          _selectedImage = image;
+          _imageBytes = bytes;
+        });
+      }
+    } catch (e) {
+      _snack('Failed to select image: $e', Colors.red);
+    }
+  }
+
+  void _removeImage() {
+    setState(() {
+      _selectedImage = null;
+      _imageBytes = null;
+    });
+  }
+
   /*──── 제출 처리 ────*/
   Future<void> _handleSubmit() async {
     if (_title.text.trim().isEmpty ||
@@ -196,11 +346,31 @@ class _FundCreateScreenState extends ConsumerState<FundCreateScreen> {
         company     : const CompanyInfo(id: 'eco', name: 'Eco Company'),
       );
 
-      final res =
-      await EcoBackend.instance.createCampaign(params); // ← 일반 create 사용
-      // Storage 업로드 필요시 res.uploadPath 활용
+      final res = await EcoBackend.instance.createCampaign(params);
+      
+      // 이미지가 선택되었다면 Firebase Storage에 업로드
+      if (_selectedImage != null && _imageBytes != null) {
+        try {
+          final storageRef = FirebaseStorage.instance.ref(res.storagePath);
+          
+          if (kIsWeb) {
+            // 웹에서는 putData 사용
+            await storageRef.putData(_imageBytes!);
+          } else {
+            // 모바일에서는 putFile 사용
+            await storageRef.putFile(File(_selectedImage!.path));
+          }
+          
+          _snack('Funding project created with image!', Colors.green);
+        } catch (uploadError) {
+          print('Image upload failed: $uploadError');
+          _snack('Project created but image upload failed', Colors.orange);
+        }
+      } else {
+        _snack('Funding project created!', Colors.green);
+      }
 
-      if (mounted) Navigator.of(context).pop(res); // 성공 후 돌아가기
+      if (mounted) Navigator.of(context).pop(res);
     } catch (e) {
       _snack('Failed to create: $e', Colors.red);
     } finally {

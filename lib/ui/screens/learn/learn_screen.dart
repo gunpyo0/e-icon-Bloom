@@ -58,12 +58,15 @@ class _LearnScreenState extends ConsumerState<LearnScreen> with WidgetsBindingOb
   Widget build(BuildContext context) {
     final asyncLessons = ref.watch(lessonsProvider);
 
-    return asyncLessons.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(child: Text('Error: $e')),
-      data: (lessons) => RefreshIndicator(
-        onRefresh: _refreshLessons,
-        child: _body(context, lessons),
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: asyncLessons.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Center(child: Text('Error: $e')),
+        data: (lessons) => RefreshIndicator(
+          onRefresh: _refreshLessons,
+          child: _body(context, lessons),
+        ),
       ),
     );
   }
@@ -84,18 +87,10 @@ class _LearnScreenState extends ConsumerState<LearnScreen> with WidgetsBindingOb
       width: double.infinity,
       height: double.infinity,
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            const Color.fromRGBO(244, 234, 225, 1),
-            const Color.fromRGBO(230, 220, 200, 1),
-            const Color.fromRGBO(220, 210, 190, 1),
-          ],
-        ),
+        color: Colors.white,
       ),
       child: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
+        padding: EdgeInsets.zero,
         child: Column(
           children: [
             ...grouped.entries.map((entry) {
@@ -148,7 +143,7 @@ class _PathLessonSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 32),
+      margin: EdgeInsets.zero,
       child: Stack(
         children: [
           // 전체 화면 바이옴 배경
@@ -164,7 +159,7 @@ class _PathLessonSection extends ConsumerWidget {
           ),
           // 레슨 노드들
           Container(
-            padding: const EdgeInsets.symmetric(vertical: 20),
+            padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 10),
             child: _buildPathLayout(context, ref),
           ),
         ],
@@ -226,86 +221,227 @@ class _PathLessonSection extends ConsumerWidget {
 
   List<Widget> _getBiomeDecorations() {
     switch (biomeIndex % 4) {
-      case 0: // 숲 바이옴 - 전체 화면에 자연스럽게 배치
+      case 0: // 숲 바이옴 - 더 많은 장식 요소들
         return [
+          // 기존 아이콘들
           Positioned(
             top: 20,
             right: 30,
-            child: Icon(Icons.local_florist, color: Colors.green[300]!.withOpacity(0.3), size: 32),
+            child: Icon(Icons.local_florist, color: Colors.green[300]!.withOpacity(0.4), size: 32),
           ),
           Positioned(
             top: 80,
             left: 40,
-            child: Icon(Icons.eco, color: Colors.green[400]!.withOpacity(0.2), size: 24),
+            child: Icon(Icons.eco, color: Colors.green[400]!.withOpacity(0.3), size: 24),
           ),
           Positioned(
             bottom: 60,
             right: 60,
-            child: Icon(Icons.park, color: Colors.green[500]!.withOpacity(0.25), size: 28),
+            child: Icon(Icons.park, color: Colors.green[500]!.withOpacity(0.35), size: 28),
           ),
           Positioned(
             bottom: 20,
             left: 50,
-            child: Icon(Icons.grass, color: Colors.green[600]!.withOpacity(0.2), size: 20),
+            child: Icon(Icons.grass, color: Colors.green[600]!.withOpacity(0.3), size: 20),
+          ),
+          // 새로운 장식들
+          Positioned(
+            top: 50,
+            left: 15,
+            child: Icon(Icons.emoji_nature, color: Colors.green[400]!.withOpacity(0.25), size: 26),
+          ),
+          Positioned(
+            top: 120,
+            right: 20,
+            child: Icon(Icons.forest, color: Colors.green[500]!.withOpacity(0.3), size: 30),
+          ),
+          Positioned(
+            bottom: 100,
+            left: 80,
+            child: Icon(Icons.spa, color: Colors.green[400]!.withOpacity(0.25), size: 22),
+          ),
+          // 나뭇잎 패턴들
+          Positioned(
+            top: 40,
+            right: 80,
+            child: Transform.rotate(
+              angle: 0.3,
+              child: Icon(Icons.eco, color: Colors.green[300]!.withOpacity(0.2), size: 18),
+            ),
+          ),
+          Positioned(
+            bottom: 40,
+            right: 30,
+            child: Transform.rotate(
+              angle: -0.5,
+              child: Icon(Icons.local_florist, color: Colors.green[500]!.withOpacity(0.25), size: 20),
+            ),
           ),
         ];
-      case 1: // 사막 바이옴 - 햇빛과 선인장들
+      case 1: // 사막 바이옴 - 더 풍부한 사막 요소들
         return [
+          // 기존 요소들 (강화)
           Positioned(
             top: 15,
             right: 25,
-            child: Icon(Icons.wb_sunny, color: Colors.orange[300]!.withOpacity(0.4), size: 40),
+            child: Icon(Icons.wb_sunny, color: Colors.orange[300]!.withOpacity(0.5), size: 40),
           ),
           Positioned(
             top: 70,
             left: 30,
-            child: Icon(Icons.wb_sunny_outlined, color: Colors.yellow[400]!.withOpacity(0.3), size: 24),
+            child: Icon(Icons.wb_sunny_outlined, color: Colors.yellow[400]!.withOpacity(0.4), size: 24),
           ),
           Positioned(
             bottom: 40,
             right: 40,
-            child: Icon(Icons.brightness_7, color: Colors.orange[400]!.withOpacity(0.3), size: 26),
+            child: Icon(Icons.brightness_7, color: Colors.orange[400]!.withOpacity(0.4), size: 26),
+          ),
+          // 새로운 사막 요소들
+          Positioned(
+            top: 45,
+            left: 20,
+            child: Icon(Icons.wb_sunny, color: Colors.yellow[300]!.withOpacity(0.3), size: 28),
+          ),
+          Positioned(
+            bottom: 80,
+            left: 40,
+            child: Transform.rotate(
+              angle: 0.8,
+              child: Icon(Icons.star, color: Colors.orange[300]!.withOpacity(0.35), size: 20),
+            ),
+          ),
+          Positioned(
+            top: 100,
+            right: 70,
+            child: Icon(Icons.flare, color: Colors.yellow[400]!.withOpacity(0.3), size: 22),
+          ),
+          // 모래 언덕과 바람 효과
+          Positioned(
+            bottom: 20,
+            right: 80,
+            child: Transform.rotate(
+              angle: 0.2,
+              child: Icon(Icons.waves, color: Colors.orange[200]!.withOpacity(0.25), size: 18),
+            ),
+          ),
+          Positioned(
+            top: 80,
+            right: 50,
+            child: Icon(Icons.grain, color: Colors.brown[300]!.withOpacity(0.2), size: 16),
           ),
         ];
-      case 2: // 바다 바이옴 - 물결과 물방울들
+      case 2: // 바다 바이옴 - 더 풍부한 바다 요소들
         return [
+          // 기존 요소들 (강화)
           Positioned(
             top: 20,
             left: 20,
-            child: Icon(Icons.waves, color: Colors.blue[300]!.withOpacity(0.3), size: 30),
+            child: Icon(Icons.waves, color: Colors.blue[300]!.withOpacity(0.4), size: 30),
           ),
           Positioned(
             top: 60,
             right: 50,
-            child: Icon(Icons.water_drop, color: Colors.blue[400]!.withOpacity(0.25), size: 22),
+            child: Icon(Icons.water_drop, color: Colors.blue[400]!.withOpacity(0.35), size: 22),
           ),
           Positioned(
             bottom: 50,
             left: 60,
-            child: Icon(Icons.water, color: Colors.lightBlue[400]!.withOpacity(0.3), size: 28),
+            child: Icon(Icons.water, color: Colors.lightBlue[400]!.withOpacity(0.4), size: 28),
           ),
           Positioned(
             bottom: 20,
             right: 30,
-            child: Icon(Icons.bubble_chart, color: Colors.blue[300]!.withOpacity(0.2), size: 18),
+            child: Icon(Icons.bubble_chart, color: Colors.blue[300]!.withOpacity(0.3), size: 18),
+          ),
+          // 새로운 바다 요소들
+          Positioned(
+            top: 90,
+            left: 30,
+            child: Transform.rotate(
+              angle: 0.4,
+              child: Icon(Icons.waves, color: Colors.cyan[300]!.withOpacity(0.25), size: 24),
+            ),
+          ),
+          Positioned(
+            bottom: 90,
+            right: 20,
+            child: Icon(Icons.water_drop, color: Colors.lightBlue[300]!.withOpacity(0.3), size: 20),
+          ),
+          Positioned(
+            top: 50,
+            right: 80,
+            child: Icon(Icons.anchor, color: Colors.blue[400]!.withOpacity(0.25), size: 26),
+          ),
+          // 물 흐름과 거품들
+          Positioned(
+            bottom: 70,
+            left: 20,
+            child: Transform.rotate(
+              angle: -0.3,
+              child: Icon(Icons.water, color: Colors.cyan[400]!.withOpacity(0.2), size: 16),
+            ),
+          ),
+          Positioned(
+            top: 40,
+            left: 70,
+            child: Icon(Icons.circle, color: Colors.lightBlue[200]!.withOpacity(0.25), size: 14),
           ),
         ];
-      case 3: // 산 바이옴 - 산과 구름들
+      case 3: // 산 바이옴 - 더 풍부한 산 요소들
         return [
+          // 기존 요소들 (강화)
           Positioned(
             top: 10,
             left: 30,
-            child: Icon(Icons.terrain, color: Colors.grey[400]!.withOpacity(0.3), size: 35),
+            child: Icon(Icons.terrain, color: Colors.grey[400]!.withOpacity(0.4), size: 35),
           ),
           Positioned(
             top: 50,
             right: 40,
-            child: Icon(Icons.cloud, color: Colors.grey[300]!.withOpacity(0.25), size: 28),
+            child: Icon(Icons.cloud, color: Colors.grey[300]!.withOpacity(0.35), size: 28),
           ),
           Positioned(
             bottom: 30,
             left: 45,
-            child: Icon(Icons.landscape, color: Colors.blueGrey[400]!.withOpacity(0.3), size: 32),
+            child: Icon(Icons.landscape, color: Colors.blueGrey[400]!.withOpacity(0.4), size: 32),
+          ),
+          // 새로운 산 요소들
+          Positioned(
+            top: 80,
+            right: 20,
+            child: Icon(Icons.filter_hdr, color: Colors.blueGrey[300]!.withOpacity(0.3), size: 30),
+          ),
+          Positioned(
+            bottom: 80,
+            right: 60,
+            child: Transform.rotate(
+              angle: 0.15,
+              child: Icon(Icons.terrain, color: Colors.grey[500]!.withOpacity(0.25), size: 24),
+            ),
+          ),
+          Positioned(
+            top: 40,
+            left: 80,
+            child: Icon(Icons.cloud_outlined, color: Colors.grey[200]!.withOpacity(0.3), size: 22),
+          ),
+          // 눈과 바위들
+          Positioned(
+            top: 20,
+            right: 70,
+            child: Icon(Icons.ac_unit, color: Colors.white.withOpacity(0.4), size: 18),
+          ),
+          Positioned(
+            bottom: 50,
+            left: 20,
+            child: Transform.rotate(
+              angle: -0.4,
+              child: Icon(Icons.circle, color: Colors.grey[600]!.withOpacity(0.2), size: 16),
+            ),
+          ),
+          Positioned(
+            top: 60,
+            left: 50,
+            child: Icon(Icons.stars, color: Colors.grey[300]!.withOpacity(0.25), size: 20),
           ),
         ];
       default:
@@ -328,30 +464,30 @@ class _PathLessonSection extends ConsumerWidget {
           
           switch (i % 4) {
             case 0: // 왼쪽
-              leftMargin = width * 0.05;
-              rightMargin = width * 0.45;
+              leftMargin = width * 0.02;
+              rightMargin = width * 0.48;
               break;
             case 1: // 중앙 오른쪽
-              leftMargin = width * 0.35;
-              rightMargin = width * 0.15;
+              leftMargin = width * 0.38;
+              rightMargin = width * 0.12;
               break;
             case 2: // 오른쪽
-              leftMargin = width * 0.45;
-              rightMargin = width * 0.05;
+              leftMargin = width * 0.48;
+              rightMargin = width * 0.02;
               break;
             case 3: // 중앙 왼쪽
-              leftMargin = width * 0.15;
-              rightMargin = width * 0.35;
+              leftMargin = width * 0.12;
+              rightMargin = width * 0.38;
               break;
             default:
-              leftMargin = width * 0.1;
-              rightMargin = width * 0.4;
+              leftMargin = width * 0.05;
+              rightMargin = width * 0.45;
           }
           
           nodes.add(
             Container(
               margin: EdgeInsets.only(
-                bottom: i == metaList.length - 1 ? 0 : 30,
+                bottom: i == metaList.length - 1 ? 0 : 20,
                 left: leftMargin,
                 right: rightMargin,
               ),
@@ -388,7 +524,7 @@ class _BiomeTransition extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.symmetric(vertical: 15),
+      margin: EdgeInsets.zero,
       child: Column(
         children: [
           // 게임 스타일 절단선
@@ -414,7 +550,7 @@ class _BiomeTransition extends StatelessWidget {
                 ],
               ),
               borderRadius: BorderRadius.circular(15),
-              border: Border.all(color: Colors.white.withOpacity(0.3), width: 2),
+              border: Border.all(color: Colors.amber.withOpacity(0.5), width: 2),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withOpacity(0.2),
@@ -548,8 +684,8 @@ class _BiomeTransitionPainter extends CustomPainter {
       end: Alignment.center,
       colors: [
         _getBiomeColor(fromBiome).withOpacity(0.4),
-        _getBiomeColor(fromBiome).withOpacity(0.1),
-        Colors.white.withOpacity(0.1),
+        _getBiomeColor(fromBiome).withOpacity(0.2),
+        _getBiomeColor(toBiome).withOpacity(0.1),
       ],
     ).createShader(Rect.fromLTWH(0, 0, size.width, size.height * 0.5));
 
@@ -566,8 +702,8 @@ class _BiomeTransitionPainter extends CustomPainter {
       begin: Alignment.center,
       end: Alignment.bottomCenter,
       colors: [
-        Colors.white.withOpacity(0.1),
-        _getBiomeColor(toBiome).withOpacity(0.1),
+        _getBiomeColor(fromBiome).withOpacity(0.1),
+        _getBiomeColor(toBiome).withOpacity(0.2),
         _getBiomeColor(toBiome).withOpacity(0.4),
       ],
     ).createShader(Rect.fromLTWH(0, size.height * 0.5, size.width, size.height * 0.5));
@@ -578,7 +714,7 @@ class _BiomeTransitionPainter extends CustomPainter {
     final glowPaint = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2
-      ..color = Colors.white.withOpacity(0.8)
+      ..color = Colors.amber.withOpacity(0.7)
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3);
 
     canvas.drawPath(tearPath, glowPaint);
@@ -587,7 +723,7 @@ class _BiomeTransitionPainter extends CustomPainter {
   void _drawCrystalEffects(Canvas canvas, Size size) {
     final paint = Paint()
       ..style = PaintingStyle.fill
-      ..color = Colors.white.withOpacity(0.6);
+      ..color = Colors.amber.withOpacity(0.6);
 
     // 왼쪽 크리스털
     _drawCrystal(canvas, const Offset(20, 0), size.height * 0.5, paint);
@@ -618,7 +754,7 @@ class _BiomeTransitionPainter extends CustomPainter {
     // 내부 반짝임
     final innerPaint = Paint()
       ..style = PaintingStyle.fill
-      ..color = Colors.white.withOpacity(0.9);
+      ..color = Colors.yellow.withOpacity(0.8);
 
     final innerPath = Path();
     innerPath.moveTo(center.dx, centerY - size * 0.5);

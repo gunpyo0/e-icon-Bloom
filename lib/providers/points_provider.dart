@@ -32,7 +32,7 @@ class PointsNotifier extends StateNotifier<AsyncValue<int>> {
       state = const AsyncValue.loading();
       // myProfile()에서 totalPoints를 가져와서 일관성 보장
       final profile = await EcoBackend.instance.myProfile();
-      final points = profile['point'] ?? 0;
+      final points = profile['totalPoints'] ?? 0;
       state = AsyncValue.data(points);
       print('Points loaded from profile: $points');
     } catch (error, stackTrace) {
@@ -46,31 +46,109 @@ class PointsNotifier extends StateNotifier<AsyncValue<int>> {
     await loadPoints();
   }
 
-  /// 포인트 추가 (즉시 UI 업데이트 + 서버 동기화)
-  void addPoints(int points) {
-    state.whenData((currentPoints) {
-      state = AsyncValue.data(currentPoints + points);
-      print('Points added: +$points (total: ${currentPoints + points})');
-      // 서버와 동기화를 위해 잠시 후 새로고침
-      Future.delayed(const Duration(milliseconds: 500), () => refresh());
-    });
+  /// 포인트 추가 (낙관적 업데이트 + 서버 검증)
+  Future<bool> addPoints(int points) async {
+    final currentState = state;
+    if (!currentState.hasValue) {
+      await refresh(); // 상태가 없으면 먼저 로드
+      return addPoints(points);
+    }
+    
+    final currentPoints = currentState.value!;
+    
+    // 낙관적 업데이트
+    final newTotal = currentPoints + points;
+    state = AsyncValue.data(newTotal);
+    print('Points added optimistically: +$points (total: $newTotal)');
+    
+    // 서버 검증 (1초 후)
+    try {
+      await Future.delayed(const Duration(seconds: 1));
+      await refresh();
+      
+      final finalState = state;
+      if (finalState.hasValue) {
+        final serverPoints = finalState.value!;
+        print('Server points after addition: $serverPoints');
+        
+        // 서버와 클라이언트 포인트가 예상과 다르면 경고
+        if ((serverPoints - newTotal).abs() > 1) {
+          print('⚠️ Point sync warning: Expected $newTotal, Server has $serverPoints');
+        }
+        return true;
+      }
+    } catch (e) {
+      print('Error during point sync: $e');
+      // 에러 발생 시 원래 포인트로 롤백
+      state = AsyncValue.data(currentPoints);
+      return false;
+    }
+    
+    return true;
   }
 
-  /// 포인트 차감 (즉시 UI 업데이트 + 서버 동기화)
-  void subtractPoints(int points) {
-    state.whenData((currentPoints) {
-      final newTotal = (currentPoints - points).clamp(0, double.infinity).toInt();
-      state = AsyncValue.data(newTotal);
-      print('Points subtracted: -$points (total: $newTotal)');
-      // 서버와 동기화를 위해 잠시 후 새로고침
-      Future.delayed(const Duration(milliseconds: 500), () => refresh());
-    });
+  /// 포인트 차감 (낙관적 업데이트 + 서버 검증)
+  Future<bool> subtractPoints(int points) async {
+    final currentState = state;
+    if (!currentState.hasValue) return false;
+    
+    final currentPoints = currentState.value!;
+    if (currentPoints < points) {
+      print('Insufficient points: $currentPoints < $points');
+      return false;
+    }
+    
+    // 낙관적 업데이트
+    final newTotal = currentPoints - points;
+    state = AsyncValue.data(newTotal);
+    print('Points subtracted optimistically: -$points (total: $newTotal)');
+    
+    // 서버 검증 (1초 후)
+    try {
+      await Future.delayed(const Duration(seconds: 1));
+      await refresh();
+      
+      final finalState = state;
+      if (finalState.hasValue) {
+        final serverPoints = finalState.value!;
+        print('Server points after donation: $serverPoints');
+        
+        // 서버와 클라이언트 포인트가 예상과 다르면 경고
+        if ((serverPoints - newTotal).abs() > 1) {
+          print('⚠️ Point sync warning: Expected $newTotal, Server has $serverPoints');
+        }
+        return true;
+      }
+    } catch (e) {
+      print('Error during point sync: $e');
+      // 에러 발생 시 원래 포인트로 롤백
+      state = AsyncValue.data(currentPoints);
+      return false;
+    }
+    
+    return true;
   }
 
   /// 포인트 직접 설정
   void setPoints(int points) {
     state = AsyncValue.data(points);
     print('Points set to: $points');
+  }
+  
+  /// 강제 동기화 (서버에서 최신 포인트 가져오기)
+  Future<void> forceSync() async {
+    print('🔄 Forcing point synchronization...');
+    await refresh();
+    
+    // 리그 포인트도 함께 동기화
+    try {
+      await EcoBackend.instance.syncMyLeaguePoints();
+    } catch (e) {
+      print('⚠️ League sync failed during force sync: $e');
+    }
+    
+    final currentPoints = state.value ?? 0;
+    print('✅ Points synchronized: $currentPoints');
   }
 }
 

@@ -699,7 +699,7 @@ class FundScreen extends ConsumerWidget {
                         topRight: Radius.circular(12),
                       ),
                     ),
-                    child: project.imageUrl != null 
+                    child: project.imageUrl != null && project.imageUrl!.isNotEmpty
                       ? ClipRRect(
                           borderRadius: const BorderRadius.only(
                             topLeft: Radius.circular(12),
@@ -708,7 +708,23 @@ class FundScreen extends ConsumerWidget {
                           child: Image.network(
                             project.imageUrl!,
                             fit: BoxFit.cover,
+                            loadingBuilder: (context, child, loadingProgress) {
+                              if (loadingProgress == null) return child;
+                              return Container(
+                                color: Colors.black,
+                                child: Center(
+                                  child: CircularProgressIndicator(
+                                    value: loadingProgress.expectedTotalBytes != null
+                                        ? loadingProgress.cumulativeBytesLoaded / 
+                                          loadingProgress.expectedTotalBytes!
+                                        : null,
+                                    valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+                                  ),
+                                ),
+                              );
+                            },
                             errorBuilder: (context, error, stackTrace) {
+                              debugPrint('❌ Image load error: $error for URL: ${project.imageUrl}');
                               return Container(
                                 color: Colors.black,
                                 child: const Center(
@@ -735,6 +751,7 @@ class FundScreen extends ConsumerWidget {
                   Positioned(
                     left: 20,
                     top: 20,
+                    right: 20,
                     child: Text(
                       project.title,
                       style: const TextStyle(
@@ -742,41 +759,8 @@ class FundScreen extends ConsumerWidget {
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
                       ),
-                    ),
-                  ),
-                  
-                  // 다운로드/공유 버튼
-                  Positioned(
-                    right: 20,
-                    bottom: 20,
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Colors.white24,
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: const Icon(
-                            Icons.download,
-                            color: Colors.white,
-                            size: 20,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Colors.white24,
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: const Icon(
-                            Icons.share,
-                            color: Colors.white,
-                            size: 20,
-                          ),
-                        ),
-                      ],
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 2,
                     ),
                   ),
                 ],

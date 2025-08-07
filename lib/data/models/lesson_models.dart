@@ -34,7 +34,7 @@ class LessonMeta {
       themeTitle      : j['themeTitle'] ?? '',
       themeDesc       : j['themeDesc'] ?? '',
       themeColor      : _hexToColor(j['themeColor'] ?? '#2196F3'),
-      themeIcon       : IconData(j['themeIcon'] ?? 0xe3af, fontFamily: 'MaterialIcons'),
+      themeIcon       : _getThemeIcon(j['themeIcon']),
       totalSteps      : j['totalSteps'] ?? 0,
       lessonPoint     : j['lessonPoint'] ?? 0,
       quizPointPerHit : j['quizPointPerHit'] ?? 0,
@@ -45,6 +45,13 @@ class LessonMeta {
     hex = hex.replaceAll('#', '');
     if (hex.length == 6) hex = 'FF$hex';
     return Color(int.parse(hex, radix: 16));
+  }
+
+  static IconData _getThemeIcon(dynamic iconData) {
+    if (iconData is String) {
+      return ThemeIconsMap[iconData] ?? Icons.eco;
+    }
+    return Icons.eco; // default fallback
   }
 }
 
@@ -79,6 +86,18 @@ const Map<String, IconData> IconsMap = {
   'cloud'   : Icons.cloud,
   'chart'   : Icons.analytics,
   'energy'  : Icons.energy_savings_leaf,
+};
+
+/// 테마 아이콘 매핑
+const Map<String, IconData> ThemeIconsMap = {
+  'eco'     : Icons.eco,
+  'science' : Icons.science,
+  'energy'  : Icons.energy_savings_leaf,
+  'water'   : Icons.water_drop,
+  'forest'  : Icons.forest,
+  'recycle' : Icons.recycling,
+  'solar'   : Icons.solar_power,
+  'leaf'    : Icons.eco,
 };
 
 class Stepadder {

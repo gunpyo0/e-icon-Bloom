@@ -41,6 +41,7 @@ class FundCampaign {
   final String subtitle;
   final String description;
   final String bannerPath;
+  final String? imageUrl;  // 추가된 필드
   final int goalAmount;
   final int collectedAmount;
   final DateTime? createdAt;
@@ -54,6 +55,7 @@ class FundCampaign {
     required this.subtitle,
     required this.description,
     required this.bannerPath,
+    this.imageUrl,  // 추가된 필드
     required this.goalAmount,
     required this.collectedAmount,
     required this.createdAt,
@@ -102,6 +104,7 @@ class FundCampaign {
       subtitle: json['subtitle'] ?? '',
       description: json['description'] ?? '',
       bannerPath: json['bannerPath'] ?? '',
+      imageUrl: json['imageUrl'], // 추가된 필드
       goalAmount: (json['goalAmount'] ?? 0) is num
           ? (json['goalAmount'] as num).toInt()
           : int.tryParse(json['goalAmount'].toString()) ?? 0,

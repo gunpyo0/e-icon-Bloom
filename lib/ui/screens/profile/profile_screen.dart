@@ -1,14 +1,31 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:bloom/data/services/eco_backend.dart';
 import 'package:bloom/providers/points_provider.dart';
 
-final profileProvider = FutureProvider<Map<String, dynamic>>((ref) async {
+final currentUserProvider = StreamProvider<User?>((ref) {
+  return FirebaseAuth.instance.authStateChanges();
+});
+
+final profileProvider = FutureProvider.autoDispose<Map<String, dynamic>>((ref) async {
+  // 현재 사용자 상태를 감지하여 사용자가 변경되면 프로필도 새로고침
+  final currentUser = ref.watch(currentUserProvider);
+  if (currentUser.value == null) {
+    throw Exception('로그인이 필요합니다');
+  }
+  
   return await EcoBackend.instance.myProfile();
 });
 
-final leagueProvider = FutureProvider<Map<String, dynamic>>((ref) async {
+final leagueProvider = FutureProvider.autoDispose<Map<String, dynamic>>((ref) async {
+  // 현재 사용자 상태를 감지
+  final currentUser = ref.watch(currentUserProvider);
+  if (currentUser.value == null) {
+    throw Exception('로그인이 필요합니다');
+  }
+  
   return await EcoBackend.instance.myLeague();
 });
 
@@ -22,7 +39,7 @@ class ProfileScreen extends ConsumerWidget {
     final pointsAsync = ref.watch(pointsProvider);
 
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: Colors.white,
       appBar: AppBar(
         title: const Text('My Profile'),
         backgroundColor: Colors.white,
@@ -135,6 +152,35 @@ class ProfileScreen extends ConsumerWidget {
                       color: Colors.grey[600],
                     ),
                   ),
+                  const SizedBox(height: 8),
+                  // 디버그 정보 표시
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[100],
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Debug Info:', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red)),
+                        Text('UID: ${profile['uid'] ?? 'null'}'),
+                        Text('Email: ${profile['email'] ?? 'null'}'),
+                        Text('Firebase displayName: ${profile['firebaseDisplayName'] ?? 'null'}'),
+                        Text('Firestore displayName: ${profile['firestoreDisplayName'] ?? 'null'}'),
+                        Text('Final displayName: ${profile['displayName'] ?? 'null'}'),
+                        const SizedBox(height: 8),
+                        Consumer(
+                          builder: (context, ref, child) {
+                            return ElevatedButton(
+                              onPressed: () => _showUpdateNameDialog(context, ref),
+                              child: const Text('이름 수정'),
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
               ),
               loading: () => const Column(
@@ -234,7 +280,9 @@ class ProfileScreen extends ConsumerWidget {
               data: (league) {
                 // If leagueId exists, participating; if not, not participating
                 final hasLeague = league['leagueId'] != null;
-                final leagueInfo = league['league'] as Map<String, dynamic>?;
+                final leagueInfo = league['league'] != null 
+                    ? Map<String, dynamic>.from(league['league'] as Map)
+                    : null;
                 
                 if (!hasLeague) {
                   return Column(
@@ -360,6 +408,62 @@ class ProfileScreen extends ConsumerWidget {
               'Logout',
               style: TextStyle(color: Colors.red),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showUpdateNameDialog(BuildContext context, WidgetRef ref) {
+    final nameController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('이름 수정'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('새로운 이름을 입력하세요:'),
+            const SizedBox(height: 16),
+            TextField(
+              controller: nameController,
+              decoration: const InputDecoration(
+                labelText: '이름',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => context.pop(),
+            child: const Text('취소'),
+          ),
+          TextButton(
+            onPressed: () async {
+              final newName = nameController.text.trim();
+              if (newName.isNotEmpty) {
+                try {
+                  await EcoBackend.instance.updateCurrentUserDisplayName(newName);
+                  if (context.mounted) {
+                    context.pop();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('이름이 성공적으로 변경되었습니다')),
+                    );
+                    // 프로필 새로고침
+                    ref.invalidate(profileProvider);
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    context.pop();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('이름 변경 실패: $e')),
+                    );
+                  }
+                }
+              }
+            },
+            child: const Text('확인'),
           ),
         ],
       ),
