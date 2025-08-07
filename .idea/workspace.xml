@@ -5,26 +5,12 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="11443f8b-fe0c-4478-84dc-918e19aa887d" name="Changes" comment="TEST TEST">
-      <change beforePath="$PROJECT_DIR$/.claude/settings.local.json" beforeDir="false" afterPath="$PROJECT_DIR$/.claude/settings.local.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/libraries/Flutter_Plugins.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/libraries/Flutter_Plugins.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/assets/green_leaf.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/assets/white_leaf.png" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/lib/core/app_router.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/core/app_router.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/data/models/fund.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/data/models/fund.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/data/models/lesson_models.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/data/models/lesson_models.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/data/services/eco_backend.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/data/services/eco_backend.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/main.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/main.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/providers/points_provider.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/providers/points_provider.dart" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/lib/ui/screens/auth/login_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/ui/screens/auth/login_screen.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/ui/screens/evaluation/evaluation_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/ui/screens/evaluation/evaluation_screen.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/ui/screens/fund/fund_create_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/ui/screens/fund/fund_create_screen.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/ui/screens/fund/fund_detail_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/ui/screens/fund/fund_detail_screen.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/ui/screens/fund/fund_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/ui/screens/fund/fund_screen.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/ui/screens/fund/fund_screen_fixed.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/ui/screens/fund/fund_screen_fixed.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/ui/screens/fund/fund_viewmodel.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/ui/screens/fund/fund_viewmodel.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/ui/screens/garden/garden_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/ui/screens/garden/garden_screen.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/ui/screens/learn/learn_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/ui/screens/learn/learn_screen.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/ui/screens/main/main_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/ui/screens/main/main_screen.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/ui/screens/profile/profile_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/ui/screens/profile/profile_screen.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/pubspec.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/pubspec.yaml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -112,6 +98,7 @@
       <recent name="C:\Users\USER\StudioProjects\e-icon-Bloomd\unity" />
     </key>
     <key name="MoveFile.RECENT_KEYS">
+      <recent name="C:\Users\User\Documents\GitHub\e-icon-Bloom\assets" />
       <recent name="C:\Users\User\Documents\GitHub\e-icon-Bloom\assets\fonts" />
       <recent name="C:\Users\User\Documents\GitHub\e-icon-Bloom\android\app" />
     </key>

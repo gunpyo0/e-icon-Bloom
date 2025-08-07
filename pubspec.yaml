@@ -83,6 +83,11 @@ flutter:
       fonts:
         - asset: assets/fonts/agrroB.ttf
 
+
+  assets:
+    - assets/green_leaf.png
+    - assets/white_leaf.png
+
     # fonts:
   #   - family: Schyler
   #     fonts:

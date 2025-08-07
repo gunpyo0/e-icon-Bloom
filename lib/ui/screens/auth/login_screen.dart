@@ -60,15 +60,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               Container(
                 width: 100,
                 height: 100,
-                decoration: const BoxDecoration(
-                  color: Colors.green,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.eco,
-                  color: Colors.white,
-                  size: 50,
-                ),
+                child: Image.asset("assets/green_leaf.png")
               ),
               const SizedBox(height: 32),
               const Text(

@@ -206,15 +206,7 @@ class _MainScaffoldState extends State<MainScaffold>
               Container(
                 width: 24,
                 height: 24,
-                decoration: const BoxDecoration(
-                  color: Colors.green,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.eco,
-                  color: Colors.white,
-                  size: 16,
-                ),
+                child: Image.asset("assets/white_leaf.png"),
               ),
               const SizedBox(width: 8),
               const Text(
