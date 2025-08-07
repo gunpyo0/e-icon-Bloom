@@ -778,12 +778,34 @@ class _PostDetailScreenState extends State<PostDetailScreen>
   List<Animation<double>> _fadeAnimations = [];
   List<Animation<Offset>> _slideAnimations = [];
   int _currentAISpeaking = -1;
+  
+  // 이미지 URL 캐싱
+  String? _cachedImageUrl;
 
   @override
   void initState() {
     super.initState();
     _initializeAnimations();
     _startAIEvaluationSequence();
+    _preloadImage();
+  }
+  
+  void _preloadImage() async {
+    final String? imageUrl = widget.post['imageUrl'];
+    final String? photoPath = widget.post['photoPath'];
+    
+    if ((imageUrl != null && imageUrl.isNotEmpty) || (photoPath != null && photoPath.isNotEmpty)) {
+      try {
+        final url = await _getImageDownloadUrl(imageUrl ?? photoPath!);
+        if (mounted) {
+          setState(() {
+            _cachedImageUrl = url;
+          });
+        }
+      } catch (e) {
+        print('Error preloading image: $e');
+      }
+    }
   }
 
   @override
@@ -944,7 +966,7 @@ class _PostDetailScreenState extends State<PostDetailScreen>
     final String? photoPath = widget.post['photoPath']; // 실제 이미지 경로
 
     return Scaffold(
-      backgroundColor: Color.fromRGBO(244, 234, 225, 1),
+      backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
@@ -958,17 +980,27 @@ class _PostDetailScreenState extends State<PostDetailScreen>
               onRefresh: () async {
                 // 새로고침 시 evaluations 데이터 다시 확인
                 try {
-                  // 포스트 데이터를 다시 가져와서 evaluations 업데이트 확인
-                  final updatedPost = await EcoBackend.instance.getPostById(widget.post['id']);
+                  // 모든 포스트를 가져와서 현재 포스트 찾기
+                  final allPosts = await EcoBackend.instance.allPosts();
+                  final currentPostId = widget.post['id'];
+                  
+                  // 현재 포스트 ID와 일치하는 포스트 찾기
+                  final updatedPost = allPosts.firstWhere(
+                    (post) => post['id'] == currentPostId,
+                    orElse: () => widget.post, // 못 찾으면 기존 데이터 유지
+                  );
+                  
                   if (mounted) {
                     setState(() {
                       // 업데이트된 포스트 데이터로 교체
-                      widget.post.addAll(updatedPost);
+                      widget.post.clear();
+                      widget.post.addAll(Map<String, dynamic>.from(updatedPost));
                     });
                     
                     // 애니메이션 다시 초기화 및 시작
                     _initializeAnimations();
                     _startAIEvaluationSequence();
+                    _preloadImage(); // 이미지도 다시 로드
                     
                     // 새로고침 완료 알림
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -1053,43 +1085,34 @@ class _PostDetailScreenState extends State<PostDetailScreen>
                               onTap: () => _showImagePreview(imageUrl ?? photoPath!),
                               child: ClipRRect(
                                 borderRadius: BorderRadius.circular(8),
-                                child: FutureBuilder<String?>(
-                                  future: _getImageDownloadUrl(imageUrl ?? photoPath!),
-                                  builder: (context, snapshot) {
-                                    if (snapshot.connectionState == ConnectionState.waiting) {
-                                      return Container(
+                                child: _cachedImageUrl != null
+                                    ? Image.network(
+                                        _cachedImageUrl!,
+                                        width: double.infinity,
+                                        fit: BoxFit.cover,
+                                        loadingBuilder: (context, child, loadingProgress) {
+                                          if (loadingProgress == null) return child;
+                                          return Container(
+                                            height: 200,
+                                            color: Colors.grey[200],
+                                            child: const Center(child: CircularProgressIndicator()),
+                                          );
+                                        },
+                                        errorBuilder: (context, error, stackTrace) {
+                                          return Container(
+                                            height: 200,
+                                            color: Colors.grey[200],
+                                            child: const Center(
+                                              child: Icon(Icons.broken_image, size: 64),
+                                            ),
+                                          );
+                                        },
+                                      )
+                                    : Container(
                                         height: 200,
                                         color: Colors.grey[200],
                                         child: const Center(child: CircularProgressIndicator()),
-                                      );
-                                    }
-                                    
-                                    if (snapshot.hasError || !snapshot.hasData || snapshot.data == null) {
-                                      return Container(
-                                        height: 200,
-                                        color: Colors.grey[200],
-                                        child: const Center(
-                                          child: Icon(Icons.broken_image, size: 64),
-                                        ),
-                                      );
-                                    }
-                                    
-                                    return Image.network(
-                                      snapshot.data!,
-                                      width: double.infinity,
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (context, error, stackTrace) {
-                                        return Container(
-                                          height: 200,
-                                          color: Colors.grey[200],
-                                          child: const Center(
-                                            child: Icon(Icons.broken_image, size: 64),
-                                          ),
-                                        );
-                                      },
-                                    );
-                                  },
-                                ),
+                                      ),
                               ),
                             ),
                           ],

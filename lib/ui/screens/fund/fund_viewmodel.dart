@@ -1,6 +1,7 @@
 // lib/ui/screens/fund/fund_viewmodel.dart
 import 'package:bloom/data/models/fund.dart';
 import 'package:bloom/data/services/eco_backend.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -30,18 +31,91 @@ class FundingProject {
     required this.creatorName,
   });
 
-  factory FundingProject.fromCampaign(FundCampaign c) => FundingProject(
-    id: c.id,
-    title: c.title,
-    description: c.description,
-    targetAmount: c.goalAmount.toDouble(),
-    currentAmount: c.collectedAmount.toDouble(),
-    daysLeft: c.endDate.difference(DateTime.now()).inDays,
-    imageUrl: null, // 필요 시 Storage URL 로 변환
-    createdAt: c.createdAt ?? DateTime.now(),
-    creatorUid: c.createdBy,
-    creatorName: c.company.name,
-  );
+  factory FundingProject.fromCampaign(FundCampaign c) {
+    debugPrint('🖼️ FundingProject.fromCampaign - imageUrl: "${c.imageUrl}", bannerPath: "${c.bannerPath}"');
+    
+    // imageUrl을 우선 사용, 없으면 bannerPath 사용
+    String? finalImageUrl;
+    if (c.imageUrl != null && c.imageUrl!.isNotEmpty) {
+      finalImageUrl = c.imageUrl;
+      debugPrint('✅ Using imageUrl: $finalImageUrl');
+    } else if (c.bannerPath.isNotEmpty) {
+      finalImageUrl = c.bannerPath;
+      debugPrint('⚠️ Fallback to bannerPath: $finalImageUrl');
+    } else {
+      finalImageUrl = null;
+      debugPrint('❌ No image URL available');
+    }
+    
+    return FundingProject(
+      id: c.id,
+      title: c.title,
+      description: c.description,
+      targetAmount: c.goalAmount.toDouble(),
+      currentAmount: c.collectedAmount.toDouble(),
+      daysLeft: c.endDate.difference(DateTime.now()).inDays,
+      imageUrl: finalImageUrl,
+      createdAt: c.createdAt ?? DateTime.now(),
+      creatorUid: c.createdBy,
+      creatorName: c.company.name,
+    );
+  }
+
+  static final Map<String, String> _urlCache = {};
+  
+  static Future<String?> getImageUrl(String? storagePath) async {
+    debugPrint('🔗 getImageUrl called with: "$storagePath"');
+    if (storagePath == null || storagePath.isEmpty) {
+      debugPrint('❌ storagePath is null or empty');
+      return null;
+    }
+    
+    // Check cache first
+    if (_urlCache.containsKey(storagePath)) {
+      debugPrint('💾 Using cached URL for: $storagePath');
+      return _urlCache[storagePath];
+    }
+    
+    try {
+      if (storagePath.startsWith('http')) {
+        debugPrint('✅ Already a URL: $storagePath');
+        _urlCache[storagePath] = storagePath;
+        return storagePath;
+      }
+      
+      // Try multiple path patterns
+      final possiblePaths = [
+        storagePath, // Original path
+        'campaigns/$storagePath', // campaigns/ folder
+        'banners/$storagePath', // banners/ folder
+        'images/$storagePath', // images/ folder
+        'fund/$storagePath', // fund/ folder
+        'fund-campaigns/$storagePath', // fund-campaigns/ folder
+      ];
+      
+      for (final path in possiblePaths) {
+        try {
+          debugPrint('📁 Trying Firebase Storage path: $path');
+          final ref = FirebaseStorage.instance.ref(path);
+          final downloadUrl = await ref.getDownloadURL();
+          debugPrint('✅ Got download URL with path "$path": $downloadUrl');
+          
+          // Cache the result
+          _urlCache[storagePath] = downloadUrl;
+          return downloadUrl;
+        } catch (e) {
+          debugPrint('❌ Path "$path" failed: $e');
+          continue;
+        }
+      }
+      
+      debugPrint('❌ All paths failed for: $storagePath');
+      return null;
+    } catch (e) {
+      debugPrint('❌ Unexpected error for $storagePath: $e');
+      return null;
+    }
+  }
 
   double get progressPercentage =>
       targetAmount == 0 ? 0 : (currentAmount / targetAmount * 100).clamp(0, 100);
@@ -70,7 +144,36 @@ class FundViewModel extends AsyncNotifier<List<FundingProject>> {
     try {
       final campaigns = await EcoBackend.instance.listCampaigns();
       debugPrint('🔥 campaigns length = ${campaigns.length}');
-      return campaigns.map(FundingProject.fromCampaign).toList();
+      
+      // Convert storage paths to download URLs
+      final projects = <FundingProject>[];
+      for (final campaign in campaigns) {
+        final project = FundingProject.fromCampaign(campaign);
+        // Pre-fetch image URL if available
+        if (project.imageUrl != null && project.imageUrl!.isNotEmpty) {
+          debugPrint('🔄 Processing image for project: ${project.title}');
+          final downloadUrl = await FundingProject.getImageUrl(project.imageUrl);
+          debugPrint('✅ Resolved URL: $downloadUrl');
+          final updatedProject = FundingProject(
+            id: project.id,
+            title: project.title,
+            description: project.description,
+            targetAmount: project.targetAmount,
+            currentAmount: project.currentAmount,
+            daysLeft: project.daysLeft,
+            imageUrl: downloadUrl, // Use the resolved URL
+            createdAt: project.createdAt,
+            creatorUid: project.creatorUid,
+            creatorName: project.creatorName,
+          );
+          projects.add(updatedProject);
+        } else {
+          debugPrint('⚠️ No image URL for project: ${project.title}');
+          projects.add(project);
+        }
+      }
+      
+      return projects;
     } catch (e, st) {
       debugPrint('❌ _fetch error: $e\n$st');
       rethrow;

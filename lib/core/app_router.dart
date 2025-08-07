@@ -2,14 +2,20 @@ import 'package:bloom/ui/screens/fund/fund_create_screen.dart';
 import 'package:bloom/ui/screens/fund/fund_screen.dart';
 import 'package:bloom/ui/screens/fund/fund_detail_screen.dart';
 import 'package:bloom/ui/screens/auth/login_screen.dart';
-import 'package:bloom/ui/screens/garden/unity.dart';
+import 'package:bloom/ui/screens/auth/signup_screen.dart';
 import 'package:bloom/ui/screens/profile/profile_screen.dart';
+import 'package:bloom/ui/screens/garden/garden_screen.dart';
 import 'package:bloom/ui/screens/learn/learn_screen.dart';
 import 'package:bloom/ui/screens/evaluation/evaluation_screen.dart';
+import 'package:bloom/ui/screens/membership/membership_screen.dart';
+import 'package:bloom/ui/screens/product/product_screen.dart';
 import 'package:bloom/ui/screens/eco_debug_page.dart';
 import 'package:bloom/data/services/eco_backend.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:bloom/providers/membership_provider.dart';
+import 'package:bloom/ui/widgets/vip_badge.dart';
 import '../ui/screens/main/main_screen.dart';
 
 final appRouter = GoRouter(
@@ -17,11 +23,12 @@ final appRouter = GoRouter(
   redirect: (context, state) {
     final isLoggedIn = EcoBackend.instance.currentUser != null;
     final isLoginRoute = state.uri.path == '/login';
+    final isSignupRoute = state.uri.path == '/signup';
     
-    if (!isLoggedIn && !isLoginRoute) {
+    if (!isLoggedIn && !isLoginRoute && !isSignupRoute) {
       return '/login';
     }
-    if (isLoggedIn && isLoginRoute) {
+    if (isLoggedIn && (isLoginRoute || isSignupRoute)) {
       return '/';
     }
     return null;
@@ -32,16 +39,32 @@ final appRouter = GoRouter(
       builder: (context, state) => const LoginScreen(),
     ),
     GoRoute(
+      path: '/signup',
+      builder: (context, state) => const SignUpScreen(),
+    ),
+    GoRoute(
       path: '/',
-      builder: (context, state) => const MainScaffold(),
+      builder: (context, state) => MainScaffold(key: mainScaffoldKey),
     ),
     GoRoute(
       path: '/profile',
       builder: (context, state) => const ProfileScreen(),
     ),
     GoRoute(
+      path: '/garden',
+      builder: (context, state) => const GardenScreen(),
+    ),
+    GoRoute(
+      path: '/learn',
+      builder: (context, state) => const LearnScreen(),
+    ),
+    GoRoute(
       path: '/fund/create',
       builder: (context, state) => const FundCreateScreen(),
+    ),
+    GoRoute(
+      path: '/product',
+      builder: (context, state) => const ProductScreen(),
     ),
     GoRoute(
       path: '/fund/:fundId',
@@ -51,6 +74,10 @@ final appRouter = GoRouter(
       },
     ),
     GoRoute(
+      path: '/membership',
+      builder: (context, state) => const MembershipScreen(),
+    ),
+    GoRoute(
       path: '/debug',
       builder: (context, state) => const EcoDebugPage(),
     ),
@@ -58,14 +85,17 @@ final appRouter = GoRouter(
   ],
 );
 
-class MainScaffold extends StatefulWidget {
+// GlobalKey for MainScaffold to access tab switching from anywhere
+final GlobalKey<_MainScaffoldState> mainScaffoldKey = GlobalKey<_MainScaffoldState>();
+
+class MainScaffold extends ConsumerStatefulWidget {
   const MainScaffold({super.key});
 
   @override
-  State<MainScaffold> createState() => _MainScaffoldState();
+  ConsumerState<MainScaffold> createState() => _MainScaffoldState();
 }
 
-class _MainScaffoldState extends State<MainScaffold>
+class _MainScaffoldState extends ConsumerState<MainScaffold>
     with TickerProviderStateMixin {
   int _index = 2; // 0: info, 1: garden, 2: main, 3: learn, 4: fund
   late PageController _pageController;
@@ -73,7 +103,7 @@ class _MainScaffoldState extends State<MainScaffold>
 
   final pages = [
     const EvaluationScreen(),
-    const UnityFullScreen(),
+    const GardenScreen(),
     const MainScreen(),
     const LearnScreen(),
     const FundScreen(),
@@ -107,6 +137,11 @@ class _MainScaffoldState extends State<MainScaffold>
     }
   }
 
+  // External method to switch tabs
+  void switchToTab(int index) {
+    _onDestinationSelected(index);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -121,9 +156,6 @@ class _MainScaffoldState extends State<MainScaffold>
           Expanded(
             child: PageView(
               controller: _pageController,
-              physics: _index == 1
-                  ? const NeverScrollableScrollPhysics()
-                  : const PageScrollPhysics(),
               onPageChanged: (index) {
                 setState(() => _index = index);
               },
@@ -145,7 +177,7 @@ class _MainScaffoldState extends State<MainScaffold>
           NavigationDestination(
             icon: Icon(Icons.yard_outlined),
             selectedIcon: Icon(Icons.yard),
-            label: 'd',
+            label: 'Garden',
           ),
           NavigationDestination(
             icon: Icon(Icons.home_outlined),
@@ -187,15 +219,7 @@ class _MainScaffoldState extends State<MainScaffold>
               Container(
                 width: 24,
                 height: 24,
-                decoration: const BoxDecoration(
-                  color: Colors.green,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.eco,
-                  color: Colors.white,
-                  size: 16,
-                ),
+                child: Image.asset("assets/white_leaf.png"),
               ),
               const SizedBox(width: 8),
               const Text(
@@ -207,6 +231,8 @@ class _MainScaffoldState extends State<MainScaffold>
                   color: Colors.white,
                 ),
               ),
+              const SizedBox(width: 12),
+              const VipBadge(size: 20, showText: true),
             ],
           ),
           const Spacer(),

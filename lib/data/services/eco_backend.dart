@@ -78,8 +78,41 @@ class EcoBackend {
 
 
   /// ▸ 이메일/패스워드 로그인
-  Future<UserCredential> signIn(String email, String pw)
-  => _auth.signInWithEmailAndPassword(email: email, password: pw);
+  Future<UserCredential> signIn(String displayName, String email, String pw) async {
+    try {
+      // 사용자 생성
+      final UserCredential cred = await FirebaseAuth.instance
+          .createUserWithEmailAndPassword(email: email, password: pw);
+
+      final String uid = cred.user!.uid;
+
+      // Firebase Auth 사용자 정보 업데이트 (displayName 설정)
+      await cred.user!.updateDisplayName(displayName);
+      await cred.user!.reload(); // 사용자 정보 새로고침
+
+      // Firestore에 사용자 정보 저장
+      await FirebaseFirestore.instance.collection('users').doc(uid).set({
+        'displayName': displayName,
+        'email': email,
+        'totalPoints': 0,
+        'eduPoints': 0,
+        'jobPoints': 0,
+        'completedLessons': 0,
+        'completedLessonIds': [],
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      print('User created successfully with displayName: $displayName');
+      return cred;
+    } catch (e) {
+      // 에러 로깅 또는 처리
+      print('Error signing in: $e');
+      rethrow; // 또는 원하는 방식으로 에러 처리
+    }
+  }
+
+
 
   /// ▸ 회원가입
   Future<UserCredential> signUp(String email, String pw)
@@ -95,42 +128,75 @@ class EcoBackend {
   /*───────────────────────── Profile ──────────────────────────*/
   Future<Map<String, dynamic>> myProfile() async {
     try {
-      // 먼저 로컬 Firestore에서 사용자 데이터 조회 시도
+      // 현재 사용자 디버그
+      await debugCurrentUser();
+      
       final user = _auth.currentUser;
-      if (user != null) {
-        final userDoc = await _fs.collection('users').doc(user.uid).get();
-
-        if (userDoc.exists) {
-          final userData = userDoc.data()!;
-          print('Profile loaded from Firestore: ${userData['totalPoints']} points');
-          return {
-            'uid': user.uid,
-            'email': user.email,
-            'displayName': user.displayName ?? userData['displayName'],
-            'photoURL': user.photoURL ?? userData['photoURL'],
-            'totalPoints': userData['totalPoints'] ?? 0,
-            'eduPoints': userData['eduPoints'] ?? 0,
-            'jobPoints': userData['jobPoints'] ?? 0,
-            'completedLessons': userData['completedLessons'] ?? 0,
-            'completedLessonIds': userData['completedLessonIds'] ?? [],
-            ...userData,
-          };
-        }
+      if (user == null) {
+        throw Exception('로그인된 사용자가 없습니다');
       }
 
-      // Firestore에 데이터가 없으면 Cloud Function 시도
-      print('No local user data, trying Cloud Function...');
-      return (await _func.httpsCallable('getMyProfile').call()).data;
-    } catch (e) {
-      print('Error getting profile: $e');
+      print('=== MY PROFILE DEBUG START ===');
+      print('Requesting profile for UID: ${user.uid}');
+      print('User email: ${user.email}');
+      
+      // 현재 사용자의 Firestore 문서만 조회
+      final userDoc = await _fs.collection('users').doc(user.uid).get();
 
-      // 모든 것이 실패하면 기본 데이터 반환
-      final user = _auth.currentUser;
-      if (user != null) {
+      if (userDoc.exists) {
+        final userData = userDoc.data()!;
+        print('Found Firestore document for current user');
+        print('Document UID: ${userDoc.id}');
+        print('Document email: ${userData['email']}');
+        print('Document displayName: ${userData['displayName']}');
+        
+        // 보안 검증: Firestore 문서의 이메일과 Firebase Auth 이메일이 일치하는지 확인
+        if (userData['email'] != user.email) {
+          print('Email mismatch detected, updating Firestore document');
+          print('Firebase Auth email: ${user.email}');
+          print('Firestore document email: ${userData['email']}');
+          
+          // Firestore 문서의 이메일을 Firebase Auth의 이메일로 업데이트
+          await _fs.collection('users').doc(user.uid).update({
+            'email': user.email,
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
+          
+          print('Updated Firestore document email to: ${user.email}');
+          userData['email'] = user.email; // 로컬 데이터도 업데이트
+        }
+        
+        // displayName 처리
+        String displayName = userData['displayName'] ?? 
+                            user.displayName ?? 
+                            user.email?.split('@')[0] ?? 
+                            'User';
+        
+        print('Final displayName: $displayName');
+        print('=== MY PROFILE DEBUG END ===');
+        
         return {
           'uid': user.uid,
           'email': user.email,
-          'displayName': user.displayName,
+          'displayName': displayName,
+          'firestoreDisplayName': userData['displayName'],  // 디버그용
+          'firebaseDisplayName': user.displayName,          // 디버그용
+          'photoURL': user.photoURL ?? userData['photoURL'],
+          'totalPoints': userData['totalPoints'] ?? 0,
+          'eduPoints': userData['eduPoints'] ?? 0,
+          'jobPoints': userData['jobPoints'] ?? 0,
+          'completedLessons': userData['completedLessons'] ?? 0,
+          'completedLessonIds': userData['completedLessonIds'] ?? [],
+        };
+      } else {
+        print('No Firestore document found for current user');
+        // Firestore 문서가 없으면 기본값으로 생성
+        final basicProfile = {
+          'uid': user.uid,
+          'email': user.email,
+          'displayName': user.displayName ?? user.email?.split('@')[0] ?? 'User',
+          'firestoreDisplayName': null,
+          'firebaseDisplayName': user.displayName,
           'photoURL': user.photoURL,
           'totalPoints': 0,
           'eduPoints': 0,
@@ -138,9 +204,25 @@ class EcoBackend {
           'completedLessons': 0,
           'completedLessonIds': [],
         };
+        
+        // 기본 프로필을 Firestore에 저장
+        await _fs.collection('users').doc(user.uid).set({
+          'displayName': basicProfile['displayName'],
+          'email': user.email,
+          'totalPoints': 0,
+          'eduPoints': 0,
+          'jobPoints': 0,
+          'completedLessons': 0,
+          'completedLessonIds': [],
+          'createdAt': FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+        
+        return basicProfile;
       }
-
-      throw Exception('사용자 프로필을 불러올 수 없습니다');
+    } catch (e) {
+      print('Error in myProfile: $e');
+      throw Exception('프로필을 불러올 수 없습니다: $e');
     }
   }
 
@@ -699,6 +781,57 @@ class EcoBackend {
         transaction.update(userDocRef, updates);
       }
     });
+
+    // 리그 멤버 포인트도 함께 업데이트
+    await _updateLeagueMemberPoints(uid, amount);
+  }
+
+  /// 리그 멤버의 포인트 업데이트
+  Future<void> _updateLeagueMemberPoints(String uid, int amount) async {
+    try {
+      // 사용자의 리그 정보 가져오기
+      final myLeagueData = await myLeague();
+      final leagueId = myLeagueData['leagueId'];
+      
+      if (leagueId == null) {
+        print('User not in any league, skipping league point update');
+        return;
+      }
+
+      // 리그 멤버 문서 참조
+      final memberDocRef = _fs.collection('leagues').doc(leagueId).collection('members').doc(uid);
+      
+      // 현재 사용자 문서에서 최신 포인트 가져오기
+      final userDoc = await _fs.collection('users').doc(uid).get();
+      final totalPoints = userDoc.data()?['totalPoints'] ?? 0;
+      
+      // 리그 멤버 포인트 업데이트
+      await memberDocRef.update({
+        'point': totalPoints,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      
+      print('✅ League member points updated: $totalPoints for user $uid in league $leagueId');
+    } catch (e) {
+      print('⚠️ Failed to update league member points: $e');
+      // 리그 포인트 업데이트 실패는 치명적이지 않으므로 에러를 던지지 않음
+    }
+  }
+
+  /// 현재 사용자의 리그 포인트를 수동으로 동기화
+  Future<void> syncMyLeaguePoints() async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) {
+        print('No current user, skipping league sync');
+        return;
+      }
+
+      print('🔄 Syncing league points for current user...');
+      await _updateLeagueMemberPoints(user.uid, 0); // amount는 실제로 사용되지 않음
+    } catch (e) {
+      print('⚠️ Failed to sync league points: $e');
+    }
   }
 
   /*──────────────────────── Posts ────────────────────────────*/
@@ -718,10 +851,14 @@ class EcoBackend {
     return (postId: postId, storagePath: storagePath);
   }
 
-  /// ② 특정 포스트 가져오기
-  Future<Map<String, dynamic>> getPostById(String postId) async {
-    final res = await _func.httpsCallable('getPostById').call({'postId': postId});
-    return Map<String, dynamic>.from(res.data);
+  /// ② 특정 포스트 가져오기 (allPosts에서 찾기)
+  Future<Map<String, dynamic>?> getPostById(String postId) async {
+    final allPosts = await this.allPosts();
+    try {
+      return allPosts.firstWhere((post) => post['id'] == postId);
+    } catch (e) {
+      return null; // 포스트를 찾지 못한 경우
+    }
   }
 
   /// ③ 투표
@@ -811,8 +948,27 @@ class EcoBackend {
         }
       }
 
-      // 사용자를 리그 멤버로 추가
-      final displayName = currentUser?.displayName ?? currentUser?.email?.split('@')[0] ?? 'User';
+      // 사용자를 리그 멤버로 추가 (Firestore에서 displayName 가져오기)
+      String displayName = 'User';
+      try {
+        final userDoc = await _fs.collection('users').doc(uid).get();
+        if (userDoc.exists) {
+          final userData = userDoc.data()!;
+          displayName = userData['displayName'] ?? 
+                       currentUser?.displayName ?? 
+                       currentUser?.email?.split('@')[0] ?? 
+                       'User';
+        } else {
+          displayName = currentUser?.displayName ?? 
+                       currentUser?.email?.split('@')[0] ?? 
+                       'User';
+        }
+      } catch (e) {
+        print('Error getting displayName from Firestore: $e');
+        displayName = currentUser?.displayName ?? 
+                     currentUser?.email?.split('@')[0] ?? 
+                     'User';
+      }
       print('Adding user to league with displayName: $displayName');
 
       final memberData = {
@@ -843,56 +999,83 @@ class EcoBackend {
   /*──────────────────── 리그 멤버 백업/복구 ────────────────────*/
   Future<void> backupLeagueMembers() async {
     try {
-      print('=== BACKING UP LEAGUE MEMBERS ===');
+      print('=== FIXING LEAGUE MEMBER DISPLAY NAMES ===');
 
-      // 먼저 기존 사용자들 찾기
-      await _findExistingUsers();
+      // 모든 리그에서 displayName이 "null"인 멤버들 찾고 수정
+      final leaguesSnapshot = await _fs.collection('leagues').get();
 
-      // 알려진 사용자들을 다시 추가
-      final knownUsers = [
-        {
-          'uid': 'AFMf69C8UkWutorsxQnUToAurTI2', // 임건표의 UID
-          'displayName': '임건표',
-          'point': 0,
-        },
-        {
-          'uid': currentUser?.uid, // 현재 사용자
-          'displayName': currentUser?.displayName ?? currentUser?.email?.split('@')[0] ?? 'User',
-          'point': 0,
-        },
-      ];
+      for (final leagueDoc in leaguesSnapshot.docs) {
+        final leagueId = leagueDoc.id;
+        print('Checking league: $leagueId');
 
-      // s1l1 리그에 멤버들 추가
-      const leagueId = 's1l1';
+        final membersSnapshot = await _fs
+            .collection('leagues')
+            .doc(leagueId)
+            .collection('members')
+            .get();
 
-      for (final user in knownUsers) {
-        if (user['uid'] != null && user['uid'].toString().isNotEmpty) {
-          try {
-            await _fs.collection('leagues').doc(leagueId).collection('members').doc(user['uid'].toString()).set({
-              'uid': user['uid'],
-              'displayName': user['displayName'],
-              'point': user['point'],
-              'joinedAt': FieldValue.serverTimestamp(),
-            });
-            print('Added user: ${user['displayName']} (${user['uid']})');
-          } catch (e) {
-            print('Failed to add user ${user['displayName']}: $e');
+        for (final memberDoc in membersSnapshot.docs) {
+          final memberData = memberDoc.data();
+          final uid = memberDoc.id;
+          final currentDisplayName = memberData['displayName'];
+          
+          print('Member $uid has displayName: "$currentDisplayName"');
+
+          // displayName이 "null" 문자열이거나 null인 경우 수정
+          if (currentDisplayName == null || 
+              currentDisplayName.toString() == 'null' || 
+              currentDisplayName.toString().trim().isEmpty) {
+            
+            try {
+              print('Fixing displayName for user: $uid');
+              
+              // 해당 사용자의 프로필에서 올바른 displayName 가져오기
+              final userDoc = await _fs.collection('users').doc(uid).get();
+              String correctDisplayName = 'User';
+              
+              if (userDoc.exists) {
+                final userData = userDoc.data()!;
+                correctDisplayName = userData['displayName'] ?? 
+                                   userData['email']?.split('@')[0] ?? 
+                                   'User ${uid.substring(0, 8)}';
+                print('Found correct displayName in user profile: $correctDisplayName');
+              } else {
+                // user 문서가 없으면 Firebase Auth에서 가져오기 시도
+                if (uid == currentUser?.uid) {
+                  correctDisplayName = currentUser?.displayName ?? 
+                                     currentUser?.email?.split('@')[0] ?? 
+                                     'User ${uid.substring(0, 8)}';
+                  print('Got displayName from Firebase Auth: $correctDisplayName');
+                } else {
+                  correctDisplayName = 'User ${uid.substring(0, 8)}';
+                  print('Using fallback displayName: $correctDisplayName');
+                }
+              }
+
+              // 리그 멤버 문서 업데이트
+              await _fs
+                  .collection('leagues')
+                  .doc(leagueId)
+                  .collection('members')
+                  .doc(uid)
+                  .update({
+                'displayName': correctDisplayName,
+                'updatedAt': FieldValue.serverTimestamp(),
+              });
+
+              print('Successfully updated displayName for $uid: "$correctDisplayName"');
+              
+            } catch (e) {
+              print('Failed to fix displayName for user $uid: $e');
+            }
           }
         }
       }
 
-      // 리그 정보도 복구
-      await _fs.collection('leagues').doc(leagueId).set({
-        'stage': 1,
-        'index': 1,
-        'memberCount': knownUsers.where((u) => u['uid'] != null).length,
-        'createdAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
-
-      print('League backup completed for league: $leagueId');
+      print('=== DISPLAY NAME FIX COMPLETED ===');
 
     } catch (e) {
-      print('Error during backup: $e');
+      print('Error during display name fix: $e');
     }
   }
 
@@ -929,6 +1112,88 @@ class EcoBackend {
 
     } catch (e) {
       print('Error finding existing users: $e');
+    }
+  }
+
+  /*──────────────────── Firebase Auth 상태 디버깅 ────────────────────*/
+  Future<void> debugCurrentUser() async {
+    final user = _auth.currentUser;
+    print('=== FIREBASE AUTH DEBUG ===');
+    if (user == null) {
+      print('ERROR: No current user signed in!');
+      return;
+    }
+    
+    print('Current User Info:');
+    print('  UID: ${user.uid}');
+    print('  Email: ${user.email}');
+    print('  DisplayName: ${user.displayName}');
+    print('  EmailVerified: ${user.emailVerified}');
+    print('  IsAnonymous: ${user.isAnonymous}');
+    print('  PhotoURL: ${user.photoURL}');
+    print('  CreationTime: ${user.metadata.creationTime}');
+    print('  LastSignInTime: ${user.metadata.lastSignInTime}');
+    
+    // Firestore 문서도 확인
+    try {
+      final userDoc = await _fs.collection('users').doc(user.uid).get();
+      print('Firestore Document:');
+      if (userDoc.exists) {
+        final data = userDoc.data()!;
+        print('  Document ID: ${userDoc.id}');
+        print('  DisplayName: ${data['displayName']}');
+        print('  Email: ${data['email']}');
+        print('  TotalPoints: ${data['totalPoints']}');
+        print('  CreatedAt: ${data['createdAt']}');
+      } else {
+        print('  ERROR: No Firestore document found for this user!');
+      }
+    } catch (e) {
+      print('  ERROR reading Firestore: $e');
+    }
+    print('==========================');
+  }
+
+  /*──────────────────── 기존 사용자 displayName 수정 ────────────────────*/
+  Future<void> updateCurrentUserDisplayName(String newDisplayName) async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) throw Exception('로그인이 필요합니다');
+
+      print('=== UPDATING USER DISPLAY NAME ===');
+      print('Current UID: ${user.uid}');
+      print('New displayName: $newDisplayName');
+
+      // 1. Firebase Auth 업데이트
+      await user.updateDisplayName(newDisplayName);
+      await user.reload();
+      print('Firebase Auth displayName updated');
+
+      // 2. Firestore 업데이트
+      await _fs.collection('users').doc(user.uid).update({
+        'displayName': newDisplayName,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      print('Firestore displayName updated');
+
+      // 3. 리그 멤버 정보도 업데이트
+      try {
+        final myLeagueData = await myLeague();
+        final leagueId = myLeagueData['leagueId'];
+        if (leagueId != null) {
+          await _fs.collection('leagues').doc(leagueId).collection('members').doc(user.uid).update({
+            'displayName': newDisplayName,
+          });
+          print('League member displayName updated');
+        }
+      } catch (e) {
+        print('Warning: Could not update league member name: $e');
+      }
+
+      print('=== UPDATE COMPLETED ===');
+    } catch (e) {
+      print('Error updating displayName: $e');
+      throw Exception('이름 업데이트에 실패했습니다: $e');
     }
   }
 
@@ -1157,10 +1422,12 @@ class EcoBackend {
 
   /*──────── 캠페인 목록 ────────*/
   Future<List<FundCampaign>> listCampaigns() async {
+    debugPrint('📡 Calling listFundCampaigns...');
     final res = await _func.httpsCallable('listFundCampaigns').call();
 
     // 1) res.data 를 일단 List<dynamic> 으로 받고
     final rawList = res.data;
+    debugPrint('📋 Got ${rawList?.length ?? 0} campaigns from server');
     if (rawList is! List) {
       throw Exception('Unexpected format: listFundCampaigns did not return a List');
     }
@@ -1174,6 +1441,7 @@ class EcoBackend {
       final map = Map<String, dynamic>.from(
         element.map((key, value) => MapEntry(key.toString(), value)),
       );
+      debugPrint('📦 Campaign raw data: ${map['id']} - bannerPath: "${map['bannerPath']}"');
       return FundCampaign.fromJson(map);
     }).toList();
   }
@@ -1191,9 +1459,27 @@ class EcoBackend {
     required String campaignId,
     required int amount,
   }) async {
-    await _func
-        .httpsCallable('donateToCampaign')
-        .call({'campaignId': campaignId, 'amount': amount});
+    try {
+      final user = _auth.currentUser;
+      if (user == null) throw Exception('로그인이 필요합니다');
+      
+      // 1. Cloud Function으로 기부 처리
+      await _func
+          .httpsCallable('donateToCampaign')
+          .call({'campaignId': campaignId, 'amount': amount});
+      
+      print('✅ Donation completed via Cloud Function');
+      
+      // 2. 로컬에서 포인트 차감 및 리그 동기화
+      await _addPointsLocal(user.uid, -amount);
+      print('✅ Local points deducted: -$amount');
+      
+      // 포인트 변경 알림
+      notifyPointsChanged();
+    } catch (e) {
+      print('❌ Donation failed: $e');
+      rethrow;
+    }
   }
   /*══════════════  Lessons & Quiz helpers  ══════════════*/
 

@@ -5,6 +5,7 @@ import 'package:bloom/data/services/eco_backend.dart';
 import 'package:bloom/ui/screens/profile/profile_screen.dart';
 import 'package:bloom/providers/points_provider.dart';
 import 'package:go_router/go_router.dart';
+import 'package:bloom/core/app_router.dart';
 
 class MainScreen extends ConsumerStatefulWidget {
   const MainScreen({super.key});
@@ -139,10 +140,13 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
     );
     return Scaffold(
       resizeToAvoidBottomInset : false,
-      backgroundColor: Color.fromRGBO(244, 234, 225, 1),
-      body: isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
+      body: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+        ),
+        child: isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : RefreshIndicator(
               onRefresh: () async {
                 await ref.read(pointsProvider.notifier).refresh();
                 await _loadData();
@@ -344,7 +348,7 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
                   // My Garden Section - Simple & Pretty
                   GestureDetector(
                     onTap: () {
-                      context.push('/garden');
+                      mainScaffoldKey.currentState?.switchToTab(1); // Garden tab index
                     },
                     child: Container(
                       width: double.infinity,
@@ -596,14 +600,15 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
                               colors: [
-                                Color.fromRGBO(171, 101, 119, 1),
-                                Color.fromRGBO(155, 85, 103, 1),
+                                Color.fromRGBO(72, 187, 120, 1),   // 바이옴과 유사한 톤
+                                Color.fromRGBO(52, 168, 83, 1),    // 중간 톤
+                                Color.fromRGBO(39, 174, 96, 1),    // 프로덕트와 유사한 톤
                               ],
                             ),
                             borderRadius: BorderRadius.circular(16),
                             boxShadow: [
                               BoxShadow(
-                                color: Color.fromRGBO(171, 101, 119, 0.4),
+                                color: Color.fromRGBO(52, 168, 83, 0.4),
                                 blurRadius: 15,
                                 offset: const Offset(0, 6),
                                 spreadRadius: 1,
@@ -625,7 +630,7 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
                                 ),
                                 child: Icon(
                                   Icons.emoji_events,
-                                  color: Color.fromRGBO(171, 101, 118, 1),
+                                  color: Color.fromRGBO(39, 174, 96, 1),
                                   size: 20,
                                 ),
                               ),
@@ -832,7 +837,7 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
                         ),
                         const SizedBox(width: 12),
                         Text(
-                          'Explore & Discover',
+                          'Explore',
                           style: TextStyle(
                             fontSize: 22,
                             fontWeight: FontWeight.bold,
@@ -861,36 +866,43 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
                     ),
                   ),
 
-                  // Quick action buttons - First row
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildBiomeCard(
-                          icon: Icons.public,
-                          title: 'Biome',
-                          subtitle: 'Explore Earth',
-                          onTap: () {
-                            // Navigate to biome screen
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _buildMembershipCard(
-                          icon: Icons.card_membership,
-                          title: 'Membership',
-                          subtitle: 'Premium Features',
-                          onTap: () {
-                            // Navigate to membership screen
-                          },
-                        ),
-                      ),
-                    ],
+                  // Biome - First row
+                  _buildBiomeCard(
+                    icon: Icons.public,
+                    title: 'Biome',
+                    subtitle: 'Explore Earth Ecosystems',
+                    onTap: () {
+                      mainScaffoldKey.currentState?.switchToTab(3); // Learn tab index
+                    },
                   ),
 
                   const SizedBox(height: 12),
 
-                  // CO2 Emissions - Second row
+                  // Membership - Second row
+                  _buildMembershipCard(
+                    icon: Icons.card_membership,
+                    title: 'Membership',
+                    subtitle: 'Unlock Premium Features',
+                    onTap: () {
+                      context.push('/membership');
+                    },
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  // Product Store - Second row
+                  _buildProductCard(
+                    icon: Icons.eco,
+                    title: 'Product',
+                    subtitle: 'Purchase Leaves & Eco Products',
+                    onTap: () {
+                      context.push('/product');
+                    },
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  // CO2 Emissions - Third row
                   _buildCO2Card(
                     icon: Icons.cloud,
                     title: 'CO₂ Emissions',
@@ -899,13 +911,13 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
                       // Navigate to CO2 tracking screen
                     },
                   ),
-                ],
-              ),
-            ),
-          ),
-    );
-  }
-
+                ], // children 리스트 닫기
+              ), // Column 닫기
+              ), // SingleChildScrollView 닫기
+        ), // RefreshIndicator 닫기
+      ), // Container 닫기
+    ); // Scaffold 닫기
+  } // build() 메서드 닫기
 
   Widget _buildQuickActionCard({
     required IconData icon,
@@ -1003,14 +1015,15 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
     required VoidCallback onTap,
   }) {
     return Container(
+      width: double.infinity,
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Color.fromRGBO(103, 128, 159, 1),  // Muted blue
-            Color.fromRGBO(88, 110, 140, 1),
-            Color.fromRGBO(73, 92, 121, 1),
+            Color.fromRGBO(41, 128, 185, 1),  // Vibrant ocean blue
+            Color.fromRGBO(52, 152, 219, 1),
+            Color.fromRGBO(155, 89, 182, 1),  // Purple accent
           ],
         ),
         borderRadius: BorderRadius.circular(20),
@@ -1035,7 +1048,7 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
           onTap: onTap,
           child: Padding(
             padding: const EdgeInsets.all(20),
-            child: Column(
+            child: Row(
               children: [
                 Container(
                   padding: const EdgeInsets.all(14),
@@ -1053,28 +1066,60 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
                   child: Icon(
                     icon,
                     color: Colors.white,
-                    size: 36,
+                    size: 32,
                   ),
                 ),
-                const SizedBox(height: 16),
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                    letterSpacing: 0.5,
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        subtitle,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.white.withOpacity(0.85),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  subtitle,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.white.withOpacity(0.85),
-                    fontWeight: FontWeight.w500,
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  textAlign: TextAlign.center,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.explore,
+                        color: Colors.white,
+                        size: 16,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Explore',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -1091,20 +1136,21 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
     required VoidCallback onTap,
   }) {
     return Container(
+      width: double.infinity,
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Color.fromRGBO(230, 126, 34, 1),   // Vibrant orange
-            Color.fromRGBO(211, 84, 0, 1),
-            Color.fromRGBO(191, 57, 0, 1),
+            Color.fromRGBO(142, 68, 173, 1),   // Premium purple
+            Color.fromRGBO(155, 89, 182, 1),
+            Color.fromRGBO(243, 156, 18, 1),   // Golden accent
           ],
         ),
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Color.fromRGBO(230, 126, 34, 0.3),
+            color: Color.fromRGBO(142, 68, 173, 0.3),
             blurRadius: 20,
             offset: const Offset(0, 8),
             spreadRadius: 2,
@@ -1123,7 +1169,7 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
           onTap: onTap,
           child: Padding(
             padding: const EdgeInsets.all(20),
-            child: Column(
+            child: Row(
               children: [
                 Container(
                   padding: const EdgeInsets.all(14),
@@ -1141,28 +1187,181 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
                   child: Icon(
                     icon,
                     color: Colors.white,
-                    size: 36,
+                    size: 32,
                   ),
                 ),
-                const SizedBox(height: 16),
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        subtitle,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.white.withOpacity(0.85),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.star,
+                        color: Colors.white,
+                        size: 16,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Premium',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProductCard({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color.fromRGBO(46, 204, 113, 1),   // Emerald green
+            Color.fromRGBO(39, 174, 96, 1),
+            Color.fromRGBO(22, 160, 133, 1),   // Teal accent
+          ],
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Color.fromRGBO(46, 204, 113, 0.3),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+            spreadRadius: 2,
+          ),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Icon(
+                    icon,
                     color: Colors.white,
-                    letterSpacing: 0.5,
+                    size: 32,
                   ),
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  subtitle,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.white.withOpacity(0.85),
-                    fontWeight: FontWeight.w500,
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        subtitle,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.white.withOpacity(0.85),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
                   ),
-                  textAlign: TextAlign.center,
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.nature,
+                        color: Colors.white,
+                        size: 16,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Go Green',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -1185,15 +1384,15 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Color.fromRGBO(125, 135, 145, 1),   // Cool grey
-            Color.fromRGBO(108, 118, 128, 1),
-            Color.fromRGBO(91, 101, 111, 1),
+            Color.fromRGBO(52, 73, 94, 1),     // Dark slate
+            Color.fromRGBO(44, 62, 80, 1),
+            Color.fromRGBO(26, 188, 156, 1),   // Turquoise accent
           ],
         ),
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Color.fromRGBO(125, 135, 145, 0.3),
+            color: Color.fromRGBO(52, 73, 94, 0.3),
             blurRadius: 20,
             offset: const Offset(0, 8),
             spreadRadius: 2,
@@ -1294,7 +1493,9 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
       ),
     );
   }
-}
+
+} // _MainScreenState 클래스 닫기
+
 
 class GardenPatternPainter extends CustomPainter {
   @override

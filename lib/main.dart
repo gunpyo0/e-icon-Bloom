@@ -22,6 +22,7 @@ class BloomApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp.router(
+      debugShowCheckedModeBanner: false,
       title: 'Bloom',
       theme: ThemeData(useMaterial3: true),
       routerConfig: appRouter,
